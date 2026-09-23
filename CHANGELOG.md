@@ -16,9 +16,11 @@ Dates are UTC, taken from when the packages went to nuget.org.
 
 ## [Unreleased]
 
-The first release, `0.1.0-alpha`, is being prepared. Generated from TypeSafe's OpenAPI document
-`3.1.0`, `info.version` `0.2.0`, retrieved 2026-09-22 (document SHA-256 `a191f8a7…c0360d5`,
-contract SHA-256 `167e85e6…91d852f6`).
+## [0.1.0-alpha] - 2026-09-23
+
+First public build. Generated from TypeSafe's OpenAPI document `3.1.0`, `info.version` `0.2.0`,
+retrieved 2026-09-22 (document SHA-256 `a191f8a7…c0360d5`, contract SHA-256
+`167e85e6…91d852f6`).
 
 ### Added
 
@@ -71,3 +73,6 @@ contract SHA-256 `167e85e6…91d852f6`).
   against hand-written fakes of the HTTP API shaped after TypeSafe's OpenAPI document. The live
   endpoint has been checked only without a key: the `401` and `403` bodies, the response headers
   and HTTP/2. What only a keyed call can settle is listed under Known Limitations in the README.
+
+[Unreleased]: https://github.com/kkdev92/jev-dotnet/compare/v0.1.0-alpha...HEAD
+[0.1.0-alpha]: https://github.com/kkdev92/jev-dotnet/releases/tag/v0.1.0-alpha
