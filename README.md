@@ -2,6 +2,7 @@
 
 [![NuGet](https://img.shields.io/nuget/v/Kkdev92.Jev)](https://www.nuget.org/packages/Kkdev92.Jev)
 [![CI](https://github.com/kkdev92/jev-dotnet/actions/workflows/ci.yml/badge.svg)](https://github.com/kkdev92/jev-dotnet/actions)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14773/badge)](https://www.bestpractices.dev/projects/14773)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue.svg)](https://dotnet.microsoft.com/)
 
