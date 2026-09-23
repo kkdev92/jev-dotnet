@@ -1,0 +1,25 @@
+# Deterministic generation requires LF line endings everywhere.
+# Git on Windows defaults core.autocrlf to true, so the working tree is pinned explicitly;
+# otherwise checkouts would differ per machine.
+* text=auto eol=lf
+
+# Specification snapshots are byte-exact provenance: provenance.json records their SHA-256 and
+# CodeGen.Tests re-verifies it. Never let git rewrite a single byte of them.
+spec/**/*.json -text
+
+# Generated sources are compared byte-for-byte by `codegen verify`.
+*.g.cs text eol=lf
+
+# Windows-only scripts keep CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.pfx binary
+*.snk binary
+*.nupkg binary

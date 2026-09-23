@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Not a unit test project: this is a real consumer application that CI publishes with Native AOT.
+    A library that builds without trim or AOT warnings is not evidence that an application using
+    it publishes and runs; this is.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsTestProject>false</IsTestProject>
+    <RootNamespace>Kkdev92.Jev.AotSmokeTests</RootNamespace>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- PublishAot is supplied on the command line by CI so a plain `dotnet build` stays fast. -->
+  </PropertyGroup>
+
+  <!--
+    Both shipping packages. The package readme tells every consumer that Native AOT is supported,
+    and dependency injection is the one that could plausibly drag reflection in.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="../../Kkdev92.Jev/Kkdev92.Jev.csproj" />
+    <ProjectReference Include="../../Kkdev92.Jev.DependencyInjection/Kkdev92.Jev.DependencyInjection.csproj" />
+    <ProjectReference Include="../Kkdev92.Jev.TestSupport/Kkdev92.Jev.TestSupport.csproj" />
+  </ItemGroup>
+
+</Project>

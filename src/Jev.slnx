@@ -1,0 +1,21 @@
+<Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Kkdev92.Jev.Benchmarks/Kkdev92.Jev.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Triage.Console/Triage.Console.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Kkdev92.Jev.AotSmokeTests/Kkdev92.Jev.AotSmokeTests.csproj" />
+    <Project Path="tests/Kkdev92.Jev.CodeGen.Tests/Kkdev92.Jev.CodeGen.Tests.csproj" />
+    <Project Path="tests/Kkdev92.Jev.ContractTests/Kkdev92.Jev.ContractTests.csproj" />
+    <Project Path="tests/Kkdev92.Jev.IntegrationTests/Kkdev92.Jev.IntegrationTests.csproj" />
+    <Project Path="tests/Kkdev92.Jev.Tests/Kkdev92.Jev.Tests.csproj" />
+    <Project Path="tests/Kkdev92.Jev.TestSupport/Kkdev92.Jev.TestSupport.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Kkdev92.Jev.CodeGen/Kkdev92.Jev.CodeGen.csproj" />
+  </Folder>
+  <Project Path="Kkdev92.Jev/Kkdev92.Jev.csproj" />
+  <Project Path="Kkdev92.Jev.DependencyInjection/Kkdev92.Jev.DependencyInjection.csproj" />
+</Solution>

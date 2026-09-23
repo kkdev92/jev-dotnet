@@ -1,0 +1,228 @@
+{
+  "$comment": [
+    "What the OpenAPI document cannot say, each entry with where it came from.",
+    "constants become fields of the generated JevContract class, so the runtime reads them from here rather than",
+    "from a literal of its own. basis is one of: documented (a TypeSafe documentation page says so), observed (seen",
+    "on the wire, dated), decision (nothing upstream settles it; this SDK chose, and the note says why).",
+    "conflicts record where TypeSafe's own descriptions of the API differ. Each carries checks against openapi.json: if a later",
+    "snapshot stops saying what a resolution relies on, generation stops and the resolution has to be revisited.",
+    "Everything here was verified on 2026-09-23 against info.version 0.2.0."
+  ],
+  "constants": [
+    {
+      "name": "defaultBaseAddress",
+      "value": "https://api.typesafe.ai",
+      "basis": "documented",
+      "sources": [
+        "https://docs.typesafe.ai/api"
+      ],
+      "note": "The origin every documented request goes to."
+    },
+    {
+      "name": "defaultModel",
+      "value": "jev-latest",
+      "basis": "documented",
+      "sources": [
+        "https://docs.typesafe.ai/models"
+      ],
+      "note": "A moving alias: 'the most recent stable, official release'. Convenient, and not reproducible; pin a versioned id such as jev-1.13.0 when results have to be comparable over time."
+    },
+    {
+      "name": "choiceOptionsMaximum",
+      "value": 255,
+      "basis": "documented",
+      "sources": [
+        "https://docs.typesafe.ai/api",
+        "https://docs.typesafe.ai/primitives/choice"
+      ],
+      "note": "'You can have a maximum of 255 options per Choice.' The OpenAPI document declares no maximum; see the conflict limits-outside-the-schema."
+    },
+    {
+      "name": "choiceOptionsMinimum",
+      "value": 1,
+      "basis": "decision",
+      "note": "No source states a minimum. Zero options can never produce an answer, so they are refused; one is the smallest request nothing rules out, and is accepted even though it can only ever select itself."
+    },
+    {
+      "name": "scoreLevelsMaximum",
+      "value": 10,
+      "basis": "documented",
+      "sources": [
+        "https://docs.typesafe.ai/api",
+        "https://docs.typesafe.ai/primitives/score"
+      ],
+      "note": "'A Score should have at least two levels; the API accepts up to 10.' The OpenAPI document declares no maximum."
+    },
+    {
+      "name": "scoreLevelsMinimum",
+      "value": 2,
+      "basis": "decision",
+      "note": "The OpenAPI document requires one level, and the HTTP reference says a Score should have at least two. A one-level score can only ever answer 0 with probability 1, so this SDK refuses it."
+    },
+    {
+      "name": "requestIdHeader",
+      "value": "x-typesafe-request-id",
+      "basis": "observed",
+      "sources": [
+        "Observed on every response, including 401 and 403, on 2026-09-23: req_ followed by 32 hex digits"
+      ],
+      "note": "The only response header the SDK reads besides Retry-After. Kept only when it is at most 128 characters of [A-Za-z0-9_-]."
+    },
+    {
+      "name": "retryAfterMillisecondsHeader",
+      "value": "retry-after-ms",
+      "basis": "decision",
+      "note": "Not in the HTTP reference, which asks for exponential backoff on 429 and 529, and not yet seen on a real 429. Read when present, before Retry-After, because it is the more precise of the two; without either, the SDK's own backoff applies."
+    },
+    {
+      "name": "overloadedStatus",
+      "value": 529,
+      "basis": "documented",
+      "sources": [
+        "https://docs.typesafe.ai/api"
+      ],
+      "note": "'TypeSafe is temporarily overloaded. Retry after a short delay.' Not a registered HTTP status; see the conflict status-529-undeclared."
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "instructions-optional",
+      "summary": "The HTTP reference marks instructions required on every question type. The OpenAPI document makes it optional and nullable on all three.",
+      "sources": [
+        {
+          "url": "https://api.typesafe.ai/openapi.json",
+          "says": "instructions is absent from 'required' on NoulQuestion, ChoiceQuestion and ScoreQuestion, and its anyOf includes null"
+        },
+        {
+          "url": "https://docs.typesafe.ai/api",
+          "says": "instructions: string | object | array, required"
+        }
+      ],
+      "resolution": "Follow the OpenAPI document, which is what the service publishes as its own validation schema. The builder omits instructions for default(JevContent) and writes null for JevContent.Null. Not yet confirmed with an authenticated call.",
+      "checks": [
+        { "pointer": "/components/schemas/NoulQuestion/required", "notContains": "instructions" },
+        { "pointer": "/components/schemas/ChoiceQuestion/required", "notContains": "instructions" },
+        { "pointer": "/components/schemas/ScoreQuestion/required", "notContains": "instructions" },
+        { "pointer": "/components/schemas/NoulQuestion/properties/instructions/anyOf", "contains": { "type": "null" } },
+        { "pointer": "/components/schemas/ChoiceQuestion/properties/instructions/anyOf", "contains": { "type": "null" } },
+        { "pointer": "/components/schemas/ScoreQuestion/properties/instructions/anyOf", "contains": { "type": "null" } }
+      ]
+    },
+    {
+      "id": "score-levels-minimum",
+      "summary": "The OpenAPI document requires one score level. The HTTP reference says a Score should have at least two.",
+      "sources": [
+        {
+          "url": "https://api.typesafe.ai/openapi.json",
+          "says": "ScoreQuestion.criteria minItems 1"
+        },
+        {
+          "url": "https://docs.typesafe.ai/api",
+          "says": "A Score should have at least two levels"
+        }
+      ],
+      "resolution": "The SDK requires two (constant scoreLevelsMinimum). A one-level score cannot carry information.",
+      "checks": [
+        { "pointer": "/components/schemas/ScoreQuestion/properties/criteria/minItems", "equals": 1 }
+      ]
+    },
+    {
+      "id": "score-legend-structured",
+      "summary": "The HTTP reference types the score legend as map<string, string>. The OpenAPI document admits strings, objects and arrays, and the documentation shows a structured legend coming back.",
+      "sources": [
+        {
+          "url": "https://api.typesafe.ai/openapi.json",
+          "says": "ScoreAnswer.legend values are anyOf string, object, array"
+        },
+        {
+          "url": "https://docs.typesafe.ai/api",
+          "says": "legend: map<string, string>"
+        },
+        {
+          "url": "https://docs.typesafe.ai/primitives/score",
+          "says": "a response whose legend values are objects with 'what' and 'examples'"
+        }
+      ],
+      "resolution": "Legend values are held as JSON, never narrowed to strings.",
+      "checks": [
+        { "pointer": "/components/schemas/ScoreAnswer/properties/legend/additionalProperties/anyOf", "contains": { "additionalProperties": true, "type": "object" } }
+      ]
+    },
+    {
+      "id": "noul-criteria-null",
+      "summary": "The HTTP reference types Noul criteria descriptions as string, object or array. The OpenAPI document also admits null.",
+      "sources": [
+        {
+          "url": "https://api.typesafe.ai/openapi.json",
+          "says": "NoulCriteria.true and NoulCriteria.false are optional, anyOf string, object, array, null"
+        },
+        {
+          "url": "https://docs.typesafe.ai/api",
+          "says": "true: string | object | array; false: string | object | array"
+        }
+      ],
+      "resolution": "Each side may be omitted, null or a value, independently.",
+      "checks": [
+        { "pointer": "/components/schemas/NoulCriteria/properties/true/anyOf", "contains": { "type": "null" } },
+        { "pointer": "/components/schemas/NoulCriteria/properties/false/anyOf", "contains": { "type": "null" } }
+      ]
+    },
+    {
+      "id": "limits-outside-the-schema",
+      "summary": "The HTTP reference limits a Choice to 255 options and a Score to 10 levels. The OpenAPI document declares neither limit.",
+      "sources": [
+        {
+          "url": "https://api.typesafe.ai/openapi.json",
+          "says": "no maxProperties on ChoiceQuestion.criteria, no maxItems on ScoreQuestion.criteria"
+        },
+        {
+          "url": "https://docs.typesafe.ai/api",
+          "says": "a maximum of 255 options per Choice; the API accepts up to 10 levels"
+        }
+      ],
+      "resolution": "Enforced before sending, from the documented values (constants choiceOptionsMaximum and scoreLevelsMaximum). If the schema starts declaring them, the generator stops on the new keyword and the two are reconciled.",
+      "checks": [
+        { "pointer": "/components/schemas/ChoiceQuestion/properties/criteria/maxProperties", "absent": true },
+        { "pointer": "/components/schemas/ScoreQuestion/properties/criteria/maxItems", "absent": true }
+      ]
+    },
+    {
+      "id": "missing-key-status",
+      "summary": "The HTTP reference answers a missing or invalid API key with 401. Observed: a missing key answers 403, an invalid one 401. Neither status is in the OpenAPI document.",
+      "sources": [
+        {
+          "url": "https://docs.typesafe.ai/api",
+          "says": "401 Unauthorized: Missing or invalid API key"
+        },
+        {
+          "url": "Observed 2026-09-23 without a key and with a malformed one",
+          "says": "403 {\"detail\":{\"error_type\":\"authentication_error\",...}} without a key; 401 with the same body shape for an invalid key"
+        }
+      ],
+      "resolution": "Neither is retried. The SDK refuses to send a request without a usable key, so a 403 it reports is the service refusing a key it was given.",
+      "checks": [
+        { "pointer": "/paths/~1v1~1systemone/post/responses/401", "absent": true },
+        { "pointer": "/paths/~1v1~1systemone/post/responses/403", "absent": true }
+      ]
+    },
+    {
+      "id": "status-529-undeclared",
+      "summary": "The HTTP reference documents 529 Overloaded. The OpenAPI document lists only 200 and 422.",
+      "sources": [
+        {
+          "url": "https://docs.typesafe.ai/api",
+          "says": "529 Overloaded: TypeSafe is temporarily overloaded. Retry after a short delay."
+        },
+        {
+          "url": "https://api.typesafe.ai/openapi.json",
+          "says": "responses 200 and 422 only"
+        }
+      ],
+      "resolution": "529 is kept as a retry candidate (constant overloadedStatus). Retrying stays opt-in.",
+      "checks": [
+        { "pointer": "/paths/~1v1~1systemone/post/responses/529", "absent": true },
+        { "pointer": "/paths/~1v1~1systemone/post/responses/422", "present": true }
+      ]
+    }
+  ]
+}

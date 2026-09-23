@@ -1,0 +1,4 @@
+static class Kkdev92.Jev.DependencyInjection.JevServiceCollectionExtensions
+    const System.String HttpClientName = "Kkdev92.Jev"
+    static Microsoft.Extensions.DependencyInjection.IHttpClientBuilder AddJev(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Kkdev92.Jev.JevClientOptions> configure)
+    static Microsoft.Extensions.DependencyInjection.IHttpClientBuilder AddJev(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<System.IServiceProvider, Kkdev92.Jev.JevClientOptions> configure)

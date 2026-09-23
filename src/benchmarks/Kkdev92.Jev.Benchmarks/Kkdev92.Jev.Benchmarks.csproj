@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- The benchmark harness requires an optimized build and rejects a Debug one. -->
+    <Optimize>true</Optimize>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <!-- Benchmark classes are public and unsealed because the harness generates code over them. -->
+    <NoWarn>$(NoWarn);CA1001;CA1515;CA1822;CA2007</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Kkdev92.Jev/Kkdev92.Jev.csproj" />
+    <ProjectReference Include="../../tests/Kkdev92.Jev.TestSupport/Kkdev92.Jev.TestSupport.csproj" />
+  </ItemGroup>
+
+</Project>

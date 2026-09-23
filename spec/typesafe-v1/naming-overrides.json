@@ -1,0 +1,9 @@
+{
+  "$comment": [
+    "C# names the naming rule would get wrong. The wire name never changes; only the identifier does.",
+    "HTTPValidationError: .NET capitalises acronyms longer than two letters as words (HttpClient)."
+  ],
+  "schemas": {
+    "HTTPValidationError": "HttpValidationError"
+  }
+}

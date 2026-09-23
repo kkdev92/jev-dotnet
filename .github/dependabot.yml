@@ -1,0 +1,33 @@
+version: 2
+
+updates:
+  # "/src", not "/": the NuGet updater takes its entry points only from files directly in this
+  # directory, not below it, and the solution is src/Jev.slnx, which lists every project in the
+  # repository. global.json and .config/dotnet-tools.json are searched for upward from here to the
+  # root, and the root Directory.Packages.props is updated because every project imports it.
+  - package-ecosystem: nuget
+    directory: "/src"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      test-dependencies:
+        patterns:
+          - "xunit*"
+          - "Microsoft.NET.Test.Sdk"
+          - "Microsoft.Extensions.TimeProvider.Testing"
+    # The core must keep zero non-framework runtime dependencies. A bot pull request that adds a
+    # package reference to src/Kkdev92.Jev is wrong by construction and must be closed rather than
+    # merged.
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+
+  # global.json pins the SDK exactly (rollForward: disable), so nothing moves it but a pull
+  # request. This is what opens one when a new SDK ships, security releases included.
+  - package-ecosystem: dotnet-sdk
+    directory: "/"
+    schedule:
+      interval: weekly

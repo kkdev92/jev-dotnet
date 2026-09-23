@@ -1,0 +1,14 @@
+<Project>
+
+  <!--
+    Imported here rather than from a props file because the target needs properties the SDK sets
+    after props are read. Only for projects that are packed: everything under src/ finds this file
+    — the tests, the code generator, the benchmarks and the samples too — and none of those
+    publishes documentation.
+
+    The XML documentation the compiler writes covers private members too, because this repository
+    comments them. See the target itself for why that is filtered rather than left alone.
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)../eng/FilterDocumentation.targets" Condition="'$(IsPackable)' == 'true'" />
+
+</Project>

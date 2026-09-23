@@ -1,0 +1,271 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Declared explicitly so the repository default can be tightened to read-only.
+# An explicit declaration overrides the default, so narrowing the default cannot break this.
+permissions:
+  contents: read
+
+# Supersede a run when the same branch is pushed again. Safe here because every job is a check:
+# nothing it cancels had side effects worth keeping.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  CI: true
+
+jobs:
+  # Refuses a pull request that introduces a dependency with a known vulnerability, or one whose
+  # licence is not compatible with shipping under MIT. Dependabot reports what is already here;
+  # this is the half that stops it arriving.
+  #
+  # Only meaningful on a pull request, where there are two commits to compare.
+  dependency-review:
+    name: dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write   # to leave the summary as a comment
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          # Anything that would actually be exploitable in a consumer's application. Low and
+          # moderate still appear in the summary; they do not block, because a wall of advisories
+          # nobody can act on is how a gate gets switched off.
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+          # The core package ships with no dependency beyond the framework, so a copyleft licence
+          # appearing at all is a change worth stopping on rather than discovering at release.
+          deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0, LGPL-2.1, LGPL-3.0
+
+  build-test:
+    name: build & test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      # Keyed on the manifests that decide the restore graph, with no restore-keys: a near-miss
+      # that seeded this folder from a different dependency set would quietly change what the
+      # build resolves.
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'global.json') }}
+
+      - name: Restore
+        run: dotnet restore src/Jev.slnx
+
+      - name: Build
+        run: dotnet build src/Jev.slnx -c Release --no-restore
+
+      # Live-API tests never gate a pull request. They live in integration.yml, which is manual.
+      # The integration project is not excluded here, and must not be: under the test platform an
+      # assembly that matches no tests fails the run rather than printing a note, so filtering it
+      # out would turn it red. It is included and skips itself for want of a key,
+      # which also means a break in that project surfaces here rather than at release.
+      - name: Test
+        run: dotnet test --solution src/Jev.slnx -c Release --no-build -- --filter-not-trait Category=Package
+
+      # Reported, never enforced. A threshold turns coverage into a number people write tests to
+      # satisfy; an artefact turns it into something a reviewer can look at when a change claims to
+      # cover something. One operating system, because the figure does not differ by platform.
+      - name: Collect coverage
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          dotnet tool restore
+          dotnet tool run dotnet-coverage collect -f cobertura -o coverage.cobertura.xml \
+            -- dotnet test --solution src/Jev.slnx -c Release --no-build -- --filter-not-trait Category=Package
+
+      - name: Summarise coverage
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          python3 - <<'PYTHON' >> "$GITHUB_STEP_SUMMARY"
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("coverage.cobertura.xml").getroot()
+          shipped = ("Kkdev92.Jev", "Kkdev92.Jev.DependencyInjection")
+
+          print("### Line coverage")
+          print()
+          print("| Assembly | Lines |")
+          print("|---|---:|")
+          for package in sorted(root.iter("package"), key=lambda p: p.get("name")):
+              if package.get("name") in shipped:
+                  print(f"| `{package.get('name')}` | {float(package.get('line-rate')) * 100:.1f}% |")
+          print()
+          print("Reported, not enforced. The full report is attached to this run.")
+          PYTHON
+
+      - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage
+          path: coverage.cobertura.xml
+          retention-days: 14
+
+      # Regenerating from the committed contract must reproduce the checked-in sources byte for
+      # byte. Running it on both operating systems is deliberate: it is the canary for line-ending
+      # and path-separator drift, which only ever shows up cross-platform.
+      - name: Verify generated sources
+        run: dotnet run --project src/tools/Kkdev92.Jev.CodeGen -c Release --no-build -- verify
+
+      # Formatting is part of the contract, not a preference: generated sources are compared byte
+      # for byte, so a stray reformat would show up as a spurious diff.
+      - name: Verify formatting
+        if: matrix.os == 'ubuntu-latest'
+        run: dotnet format src/Jev.slnx --verify-no-changes
+
+      # NuGetAudit already fails restore on a vulnerable package. This reports transitive
+      # advisories that do not meet the failure threshold, so they are visible before they bite.
+      - name: Report vulnerable packages
+        if: matrix.os == 'ubuntu-latest'
+        run: dotnet list src/Jev.slnx package --vulnerable --include-transitive
+
+      - name: Pack
+        run: dotnet pack src/Jev.slnx -c Release --no-build -o artifacts
+
+      # Runs against the packed output, so it has to follow Pack rather than join the main test
+      # step. .gitignore has no bearing on what gets packed; this is what actually enforces it.
+      - name: Verify the packages
+        run: dotnet test --project src/tests/Kkdev92.Jev.Tests -c Release --no-build -- --filter-trait Category=Package
+
+      # The AOT smoke job references the projects, so it would keep passing if the packages
+      # stopped carrying what a consumer's own AOT publish needs. This one has only the nupkgs, and
+      # source mapping so those ids cannot quietly be satisfied from anywhere else.
+      - name: Native AOT from the packages alone
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          version=$(ls artifacts/Kkdev92.Jev.[0-9]*.nupkg | head -1 \
+            | sed 's|.*/Kkdev92[.]Jev[.]||; s|[.]nupkg$||')
+
+          echo "Building an AOT consumer against ${version}"
+
+          mkdir -p "${RUNNER_TEMP}/aot-consumer"
+          cd "${RUNNER_TEMP}/aot-consumer"
+
+          cat > nuget.config <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="artifacts" value="${GITHUB_WORKSPACE}/artifacts" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="artifacts"><package pattern="Kkdev92.Jev*" /></packageSource>
+              <packageSource key="nuget.org"><package pattern="*" /></packageSource>
+            </packageSourceMapping>
+          </configuration>
+          EOF
+
+          cat > Consumer.csproj <<EOF
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <OutputType>Exe</OutputType>
+              <TargetFramework>net10.0</TargetFramework>
+              <Nullable>enable</Nullable>
+              <ImplicitUsings>enable</ImplicitUsings>
+              <PublishAot>true</PublishAot>
+              <TrimmerSingleWarn>false</TrimmerSingleWarn>
+              <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+              <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+            </PropertyGroup>
+            <ItemGroup>
+              <PackageReference Include="Kkdev92.Jev" Version="${version}" />
+              <PackageReference Include="Kkdev92.Jev.DependencyInjection" Version="${version}" />
+            </ItemGroup>
+          </Project>
+          EOF
+
+          cat > Program.cs <<'EOF'
+          using Kkdev92.Jev;
+          using Kkdev92.Jev.DependencyInjection;
+          using Microsoft.Extensions.DependencyInjection;
+
+          var services = new ServiceCollection();
+          services.AddJev(o => o.Credential = new StaticJevCredential("sk-package-consumer-not-a-key"));
+
+          using var provider = services.BuildServiceProvider();
+
+          var builder = new JevDecisionPlanBuilder();
+          builder.AddNoul("urgent", "Does this need an answer today?");
+
+          Console.WriteLine(provider.GetRequiredService<JevClient>() is not null);
+          Console.WriteLine(builder.Build().QuestionCount);
+          Console.WriteLine(JevClientOptions.DefaultBaseAddress);
+          Console.WriteLine("package-only AOT ok");
+          EOF
+
+          NUGET_PACKAGES="${RUNNER_TEMP}/aot-cache" dotnet publish -c Release -o out
+          ./out/Consumer | tee result.txt
+          grep -q "package-only AOT ok" result.txt
+
+      - name: Upload packages
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nupkg
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+          retention-days: 14
+
+  aot-smoke:
+    name: native aot smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'global.json') }}
+
+      # A library that merely builds is not evidence of AOT compatibility; a consumer application
+      # has to publish, and then run.
+      - name: Publish AOT smoke app
+        run: >
+          dotnet publish src/tests/Kkdev92.Jev.AotSmokeTests/Kkdev92.Jev.AotSmokeTests.csproj
+          -c Release -p:PublishAot=true -o artifacts/aot
+
+      - name: Run AOT smoke app
+        shell: bash
+        run: |
+          if [ -f artifacts/aot/Kkdev92.Jev.AotSmokeTests.exe ]; then
+            ./artifacts/aot/Kkdev92.Jev.AotSmokeTests.exe
+          else
+            ./artifacts/aot/Kkdev92.Jev.AotSmokeTests
+          fi

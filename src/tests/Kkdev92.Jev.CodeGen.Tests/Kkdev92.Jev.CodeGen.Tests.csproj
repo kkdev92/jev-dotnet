@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../../tools/Kkdev92.Jev.CodeGen/Kkdev92.Jev.CodeGen.csproj" />
+  </ItemGroup>
+
+</Project>

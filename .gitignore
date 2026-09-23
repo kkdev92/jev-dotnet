@@ -1,0 +1,82 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+artifacts/
+publish/
+
+# Native AOT intermediates
+*.ilk
+*.pdb
+*.obj
+*.lib
+*.exp
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# Test / coverage results
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.trx
+BenchmarkDotNet.Artifacts/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# MSBuild
+*.binlog
+msbuild.log
+project.lock.json
+project.fragment.lock.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local-only documents: scratch design and planning notes (work/) and the internal
+# documentation (docs/ at the root). Neither is part of the published repository, so nothing
+# committed here may link to them or name a file in them.
+work/
+/docs/
+
+# Local-only tooling configuration: agent settings and MCP server definitions. The .NET tool
+# manifest in .config/ stays committed, because 'dotnet tool restore' has to work everywhere.
+.claude/
+.mcp.json
+
+# A copy of TypeSafe's own OpenAPI document saved beside the contract. The repository keeps the
+# extracted contract and the document's hash, never the document: TypeSafe's terms of use do not
+# permit redistributing it. The code generator also refuses to run while a copy sits there, so a
+# forced add does not get far either.
+spec/**/openapi.upstream.json
+spec/**/openapi.raw.json
+
+# Local-only secrets. The integration tests read their API key from an environment variable;
+# never commit a key file, even by accident.
+*.local.json
+secrets.json
+.env
+.env.*
+*.pem
+*.p12
+*.pfx
+
+# Screenshots pasted into the editor and browser automation scratch output. Local, and they tend
+# to contain whatever was on screen.
+.clipshot/
+.playwright/
+.playwright-cli/

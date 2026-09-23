@@ -1,0 +1,7 @@
+{
+  "$comment": "Which contracts exist under spec/, and which one the generated sources come from.",
+  "current": "typesafe-v1",
+  "supported": [
+    "typesafe-v1"
+  ]
+}

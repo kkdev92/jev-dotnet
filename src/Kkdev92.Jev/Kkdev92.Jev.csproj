@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A published package: see the file for what that brings with it. -->
+  <Import Project="$(MSBuildThisFileDirectory)../Package.props" />
+
+  <PropertyGroup>
+    <Description>Unofficial .NET 10 SDK for Jev, TypeSafe's System One API. Typed decision plans encoded once and reused, answers checked against the contract before you read them, a contract generated from the service's own OpenAPI document, zero non-framework runtime dependencies, Native AOT ready.</Description>
+    <!-- The core has no package references at all, so reference verification is meaningful here. -->
+    <VerifyReferenceAotCompatibility>true</VerifyReferenceAotCompatibility>
+  </PropertyGroup>
+
+  <!--
+    The DI package shares one admission gate across the transient clients a container creates, so
+    it reaches one internal constructor. The benchmarks measure the internal decoders directly.
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kkdev92.Jev.DependencyInjection" />
+    <InternalsVisibleTo Include="Kkdev92.Jev.Tests" />
+    <InternalsVisibleTo Include="Kkdev92.Jev.ContractTests" />
+    <InternalsVisibleTo Include="Kkdev92.Jev.Benchmarks" />
+  </ItemGroup>
+
+</Project>

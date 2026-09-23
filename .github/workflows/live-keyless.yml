@@ -1,0 +1,66 @@
+name: live-keyless
+
+# Checks against the live API that need no key and cost nothing: a request with no key is refused
+# with 403, one with a wrong key with 401, both with the {"detail":{"error_type":…}} body, a request
+# id and HTTP/2 — and the SDK reads the 401 as documented, sends it once with retries on, and never
+# repeats the key. See KeylessLiveTests in src/tests/Kkdev92.Jev.IntegrationTests.
+#
+# Manual only, and deliberately so. Nothing here is billed, but every request is one to somebody
+# else's service, and a scheduled stream of unauthenticated requests is indistinguishable from
+# probing. Run it when TypeSafe announces a change, or when the observations recorded in
+# spec/typesafe-v1/semantics.json (missing-key-status) need to be current — for instance before a
+# release, beside integration.yml.
+#
+# No secret is used, so this runs the same from a fork.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  keyless:
+    name: live API without a key
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Run the keyless checks
+        env:
+          JEV_DOTNET_KEYLESS_LIVE: "1"
+          JEV_DOTNET_LIVE_REPORT: ${{ runner.temp }}/live-report.md
+        run: dotnet test --project src/tests/Kkdev92.Jev.IntegrationTests -c Release -- --filter-trait Category=LiveKeyless
+
+      - name: Publish the report
+        if: always()
+        env:
+          REPORT: ${{ runner.temp }}/live-report.md
+        run: |
+          if [ -s "$REPORT" ]; then
+            { echo "## What the live API did without a key"; echo; cat "$REPORT"; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: live-keyless-report
+          path: ${{ runner.temp }}/live-report.md
+          if-no-files-found: ignore
+          retention-days: 90

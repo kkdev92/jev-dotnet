@@ -1,0 +1,50 @@
+<Project>
+
+  <!--
+    Repository-wide defaults.
+
+    JsonSerializerIsReflectionEnabledByDefault is deliberately NOT set here. The no-reflection
+      rule applies to the shipping packages, the samples, the benchmarks and the AOT smoke app, so
+      it lives beside each of those instead. Setting it repository-wide would also disable
+      reflection-based JSON inside test helpers, which is not the intent.
+
+    InvariantGlobalization is deliberately NOT set here either. The generator tests run the same
+      input under several cultures to prove the output does not depend on one, and a test host in
+      invariant mode cannot construct any culture but the invariant one.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Pinned, never latest or preview: a language version that moves with the SDK is a build
+         that changes meaning without a commit. -->
+    <LangVersion>14.0</LangVersion>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>10.0</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

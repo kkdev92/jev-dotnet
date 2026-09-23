@@ -1,0 +1,145 @@
+name: spec-check
+
+# Detects a TypeSafe-side change to the API's OpenAPI document and opens an issue. It never
+# commits: refreshing the contract and regenerating C# stays a reviewed, human-initiated action,
+# and a bot does not push to main.
+#
+# Run by hand — before a release, or when TypeSafe announces a change — and never on a schedule or
+# on every push: TypeSafe's terms of use do not allow programs that monitor or download content
+# from its site, subdomains included. Repetition is handled by not saying the same thing twice —
+# see the report step — so running it again costs a comment only when the document moved again.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+# One at a time, but never cancelled: a cancelled run could stop after opening an issue and before
+# commenting on it.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  diff:
+    name: compare against the live document
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Diff
+        id: diff
+        run: |
+          set -o pipefail
+          dotnet run --project src/tools/Kkdev92.Jev.CodeGen -c Release -- diff | tee diff.txt
+
+          # The diff command reports; it does not fail. Decide here whether anything changed. These
+          # headings are the interface — DiffReport in the generator documents them.
+          if grep -qE "^(Additive / safe|Potentially breaking|Annotations only|Other contract change) \(" diff.txt; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open an issue when the document moved
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            const diff = fs.readFileSync('diff.txt', 'utf8');
+            const title = 'TypeSafe API contract change detected';
+
+            // The label is how this workflow finds its own issue next time, so it cannot be assumed
+            // to exist. Creating one that is already there answers 422 with already_exists, which
+            // is the success case; any other validation failure is not.
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'spec-change',
+                color: 'c2e0c6',
+                description: 'The live OpenAPI document differs from the committed contract',
+              });
+            } catch (error) {
+              const existing = error.status === 422
+                && (error.response?.data?.errors ?? []).some(e => e.code === 'already_exists');
+
+              if (!existing) { throw error; }
+            }
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'spec-change',
+            });
+
+            const body = [
+              'The live OpenAPI document differs from the one the committed contract was extracted from.',
+              '',
+              '```text',
+              diff.slice(0, 60000),
+              '```',
+              '',
+              'To act on this:',
+              '',
+              '```bash',
+              'dotnet run --project src/tools/Kkdev92.Jev.CodeGen -c Release -- fetch',
+              'dotnet run --project src/tools/Kkdev92.Jev.CodeGen -c Release -- generate',
+              'dotnet test --solution src/Jev.slnx -c Release -- --filter-not-trait Category=Package',
+              '```',
+              '',
+              'Review the contract and generated diffs before merging. A new operation stops generation',
+              'until `spec/typesafe-v1/public-surface.json` approves or excludes it, and a decision in',
+              '`semantics.json` whose basis changed stops it until the decision is revisited.',
+              '"Annotations only" means the descriptions moved and the contract did not: `fetch`',
+              'records the new document hash, and nothing else changes.',
+            ].join('\n');
+
+            if (existing.data.length > 0) {
+              const issue = existing.data[0];
+
+              // Say it once. Drift lasts until somebody acts on it, and repeating an identical
+              // report every morning is how a useful check becomes one people filter out.
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                per_page: 100,
+              });
+
+              const lastSaid = comments.length > 0 ? comments[comments.length - 1].body : issue.body;
+
+              if ((lastSaid ?? '').trim() === body.trim()) {
+                core.info(`Already reported on #${issue.number}; nothing new to say.`);
+                return;
+              }
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                labels: ['spec-change'],
+                body,
+              });
+            }

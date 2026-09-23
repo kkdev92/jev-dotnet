@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The client end to end, over a fake HttpMessageHandler: the exact requests it sends, and what it
+    does with every kind of answer. No network.
+  -->
+  <PropertyGroup>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Kkdev92.Jev/Kkdev92.Jev.csproj" />
+    <ProjectReference Include="../Kkdev92.Jev.TestSupport/Kkdev92.Jev.TestSupport.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+  </ItemGroup>
+
+</Project>

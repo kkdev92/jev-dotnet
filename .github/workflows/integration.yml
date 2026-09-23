@@ -1,0 +1,98 @@
+name: integration
+
+# Live API tests. Never a pull-request gate: they need a key, and every evaluation is billed.
+#
+# Run this by hand after merging the version bump and before tagging. It is the only check that
+# sees what TypeSafe's service *does* with a real request; what TypeSafe *says* — the OpenAPI
+# document — is compared by spec-check, which needs no key. The gap this one covers is behaviour
+# that differs from the document, and the questions only a keyed call can settle — the readme
+# lists them under Known Limitations.
+#
+# The budget per run is fixed by the tests themselves: three small evaluations and one model
+# listing. What needs no key — how a missing or wrong key is refused — is live-keyless.yml's.
+#
+# The tests assert only what the contract promises. What it leaves open — how precise the numbers
+# are, how far a distribution strays from its answer, what a legend echoes — they write to a
+# report, published below as the run summary and an artifact; the consistency tolerance is set
+# from these reports.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  live:
+    name: live API
+    runs-on: ubuntu-latest
+    # The key lives in this environment, which can require a reviewer before a run starts.
+    environment: integration
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      # Every run of this workflow is somebody deciding to ask the question, so a skip is a
+      # non-answer rather than a polite no-op — and a non-answer read as a pass is how a check
+      # stops being one. A fork without the secret gets a red tick, with the reason.
+      - name: Require a key
+        env:
+          JEV_DOTNET_INTEGRATION_API_KEY: ${{ secrets.JEV_DOTNET_INTEGRATION_API_KEY }}
+        run: |
+          if [ -z "${JEV_DOTNET_INTEGRATION_API_KEY}" ]; then
+            echo "::error::JEV_DOTNET_INTEGRATION_API_KEY is not set in the 'integration' environment," \
+                 "so the live API cannot be reached; failing rather than reporting a pass it did not earn." >&2
+            exit 1
+          fi
+
+      - name: Run the live tests
+        id: tests
+        env:
+          JEV_DOTNET_INTEGRATION_API_KEY: ${{ secrets.JEV_DOTNET_INTEGRATION_API_KEY }}
+          JEV_DOTNET_LIVE_REPORT: ${{ runner.temp }}/live-report.md
+        run: dotnet test --project src/tests/Kkdev92.Jev.IntegrationTests -c Release -- --filter-trait Category=Integration
+
+      # Written whatever the outcome: a refusal is an observation too. The report holds no key, no
+      # body and no request id — see LiveReport in the test project.
+      - name: Publish the report
+        if: always()
+        env:
+          REPORT: ${{ runner.temp }}/live-report.md
+        run: |
+          if [ -s "$REPORT" ]; then
+            { echo "## What the live API did"; echo; cat "$REPORT"; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: live-report
+          path: ${{ runner.temp }}/live-report.md
+          if-no-files-found: ignore
+          retention-days: 90
+
+      # So that "when did this last actually reach TypeSafe?" has an answer that is not inferred
+      # from a green tick.
+      - name: Record what this run proved
+        if: always()
+        run: |
+          if [ "${{ steps.tests.outcome }}" = "success" ]; then
+            echo "Live API reached at $(date -u +'%Y-%m-%dT%H:%M:%SZ')." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "The live tests did not pass, so this run proves nothing about the live API." >> "$GITHUB_STEP_SUMMARY"
+          fi

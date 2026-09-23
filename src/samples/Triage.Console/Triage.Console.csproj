@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Triage</RootNamespace>
+    <AssemblyName>Triage</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Kkdev92.Jev/Kkdev92.Jev.csproj" />
+  </ItemGroup>
+
+</Project>

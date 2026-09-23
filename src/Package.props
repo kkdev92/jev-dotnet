@@ -1,0 +1,97 @@
+<Project>
+
+  <!--
+    What every package this repository publishes has in common: identity, metadata, symbols,
+    package validation, and the readme and legal files that go inside it.
+
+    Imported explicitly by each shipping project, rather than living in a Directory.Build.props
+    that everything under src/ would pick up. The tests, the code generator, the benchmarks and the
+    samples live under src/ too, and nothing about them is published; an opt-in cannot be inherited
+    by accident, where an opt-out has to be remembered by every new folder.
+
+    The repository-wide defaults — target framework, language version, analyzers, central package
+    management — come from the root Directory.Build.props, which every project imports first.
+  -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- Reflection-based serialization is never a fallback. -->
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+
+    <!-- VerifyReferenceAotCompatibility is set per project,
+         because it only makes sense where the dependency set is under our control. -->
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <!-- Package identity:
+       the NuGet version axis is independent of the TypeSafe API version. -->
+  <PropertyGroup>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionSuffix Condition="'$(VersionSuffix)' == ''">alpha</VersionSuffix>
+    <Authors>kkdev92</Authors>
+    <Company>kkdev92</Company>
+    <Product>Kkdev92.Jev</Product>
+    <Copyright>Copyright (c) kkdev92</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://kkdev92.dev/</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/kkdev92/jev-dotnet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>jev;typesafe;system-one;classification;decision;sdk;aot</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+  </PropertyGroup>
+
+  <!-- Deterministic build / Source Link. -->
+  <PropertyGroup>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <!--
+    Package validation. Once a version is on nuget.org, PackageValidationBaselineVersion names it
+    and pack compares the assemblies being built against it, so a binary breaking change fails the
+    pack rather than waiting for a reviewer to spot it in a diff.
+
+    0.1.0-alpha is the first release, so there is nothing to compare against yet, and
+    LastVersionWithoutBaseline records that. Moving VersionPrefix past it without setting a
+    baseline stops the build with instructions, so the absence cannot quietly outlive the one
+    release it was meant for.
+
+    Until then, the approved public API snapshot in src/tests/PublicApi is the signal watching the
+    surface.
+  -->
+  <PropertyGroup>
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <LastVersionWithoutBaseline>0.1.0</LastVersionWithoutBaseline>
+  </PropertyGroup>
+
+  <!--
+    Hooked before BeforeBuild rather than Build: Build's own dependencies, compilation included,
+    run before anything hooked BeforeTargets="Build", so the refusal would come after the work it
+    makes pointless. GenerateNuspec covers a pack run with no build in front of it.
+  -->
+  <Target Name="RequireAPackageValidationBaseline"
+          BeforeTargets="BeforeBuild;GenerateNuspec"
+          Condition="'$(IsPackable)' == 'true'
+                     AND '$(PackageValidationBaselineVersion)' == ''
+                     AND $([MSBuild]::VersionGreaterThan('$(VersionPrefix)', '$(LastVersionWithoutBaseline)'))">
+    <Error Text="This project is version $(VersionPrefix) and no PackageValidationBaselineVersion is set. $(LastVersionWithoutBaseline)-alpha was the first release and had nothing to compare against; past it, nothing would be checking binary compatibility at all. Set PackageValidationBaselineVersion in src/Package.props to the last version published to nuget.org, or, if this release is a deliberate reshape of the surface, move LastVersionWithoutBaseline forward and say why in the same commit." />
+  </Target>
+
+  <ItemGroup>
+    <!--
+      A separate readme for the package, not the repository one. nuget.org resolves relative links
+      against itself, so every relative link in the repository readme would 404 there; this copy
+      uses absolute URLs and drops the contributor-facing sections.
+    -->
+    <None Include="$(MSBuildThisFileDirectory)../eng/PACKAGE-README.md" Pack="true" PackagePath="\README.md" Visible="false" />
+    <!-- Attribution for the TypeSafe material the contract derives from, and the non-affiliation notice. -->
+    <None Include="$(MSBuildThisFileDirectory)../NOTICE" Pack="true" PackagePath="\" Visible="false" />
+    <!-- The license text itself, not only the MIT expression: NOTICE refers to it. -->
+    <None Include="$(MSBuildThisFileDirectory)../LICENSE" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+</Project>

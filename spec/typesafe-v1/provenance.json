@@ -1,0 +1,25 @@
+{
+  "$comment": [
+    "Facts about where the snapshot came from. Rewritten by 'codegen fetch'; never hand-edited.",
+    "upstream describes TypeSafe's document exactly as the endpoint served it. It is not committed: TypeSafe's",
+    "terms of use do not permit redistributing it, and its hash is enough to identify it. snapshot describes",
+    "openapi.json, the contract extracted from it: every structural keyword and none of the descriptions, titles",
+    "or examples, with keys sorted ordinally, two-space indent, LF and a trailing newline.",
+    "retrievedAtUtc is provenance only and must never reach generated C#."
+  ],
+  "contract": "typesafe-v1",
+  "source": "https://api.typesafe.ai/openapi.json",
+  "retrievedAtUtc": "2026-09-22T21:48:59Z",
+  "openapi": "3.1.0",
+  "title": "TypeSafe",
+  "infoVersion": "0.2.0",
+  "upstream": {
+    "sha256": "a191f8a7df6bd6fedced8120dd0fd106f88575d1d1c8360d08900a6c7c0360d5",
+    "byteLength": 14158
+  },
+  "snapshot": {
+    "file": "openapi.json",
+    "sha256": "167e85e6636569ca7e303290bce60bdb7ea9cc416ef830b087f4930891d852f6",
+    "byteLength": 12423
+  }
+}

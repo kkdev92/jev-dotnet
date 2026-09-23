@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Scaffolding shared by the test projects. Not a test project itself, and deliberately free of any
+    test framework: the Native AOT smoke application is a consumer too, and it cannot take one with
+    it. That constraint is what keeps this a library of fakes rather than a place assertions
+    accumulate.
+  -->
+  <PropertyGroup>
+    <IsTestProject>false</IsTestProject>
+    <RootNamespace>Kkdev92.Jev.TestSupport</RootNamespace>
+    <!-- The AOT smoke application publishes this, so a problem surfaces at build rather than there. -->
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Kkdev92.Jev/Kkdev92.Jev.csproj" />
+  </ItemGroup>
+
+</Project>

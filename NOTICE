@@ -1,0 +1,43 @@
+Kkdev92.Jev
+Copyright (c) 2026 kkdev92
+
+The original source code of this project is licensed under the MIT License. See
+LICENSE, included alongside this file.
+
+--------------------------------------------------------------------------------
+Relationship to TypeSafe
+--------------------------------------------------------------------------------
+
+This is an unofficial, independent client for the TypeSafe API. It is not
+affiliated with, endorsed by, or sponsored by TypeSafe, and TypeSafe does not
+support it.
+
+"TypeSafe", "Jev" and "System One" are names TypeSafe uses for its company, its
+models and its API, and may be trademarks of TypeSafe. They are used here only
+to identify the service this software interoperates with.
+
+--------------------------------------------------------------------------------
+Material derived from TypeSafe's API description
+--------------------------------------------------------------------------------
+
+The wire contract this software implements -- the paths, the JSON member names,
+the value types, which members are required, and the documented bounds -- is
+taken from the OpenAPI document TypeSafe serves at
+
+    https://api.typesafe.ai/openapi.json
+
+Those are the facts any client that interoperates with the service has to use.
+They reach the packages only as names and constants in compiled code.
+
+The document itself is not included, in the packages or in the source
+repository. The repository keeps the contract extracted from it
+(spec/typesafe-v1/openapi.json): the document's structure with every
+description, example and schema title removed, and the SHA-256 of the document
+as it was served, so that a copy can be identified without being
+redistributed. No description or other prose from TypeSafe's documentation is
+reproduced in the packages.
+
+The source repository's record of where TypeSafe's descriptions of the API
+differ (spec/typesafe-v1/semantics.json) quotes short passages of TypeSafe's
+public documentation, each attributed to its source, where they are needed to
+show what each description says.

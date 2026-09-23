@@ -1,0 +1,41 @@
+<Project>
+
+  <!--
+    Central Package Management.
+
+    Kkdev92.Jev (the core) must stay at ZERO non-framework runtime dependencies.
+    Nothing here may be referenced by the core project.
+  -->
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <!-- Test infrastructure -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageVersion Include="xunit.v3" Version="4.0.1" />
+    <!-- Proves the deadline and the retry schedule without spending real seconds. -->
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
+  </ItemGroup>
+
+  <!-- Benchmarks (not shipped) -->
+  <ItemGroup>
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+  </ItemGroup>
+
+  <!-- Code generator (repository-internal tool, not shipped) -->
+  <ItemGroup>
+    <PackageVersion Include="System.CommandLine" Version="2.0.12" />
+  </ItemGroup>
+
+  <!--
+    DependencyInjection package only. Kept out of the core so that the core does not take a
+    dependency on Microsoft.Extensions.*.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.12" />
+  </ItemGroup>
+
+</Project>

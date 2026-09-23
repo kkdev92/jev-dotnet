@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../../Kkdev92.Jev/Kkdev92.Jev.csproj" />
+    <!-- The live tests compose the client the way a consumer would, through the container. -->
+    <ProjectReference Include="../../Kkdev92.Jev.DependencyInjection/Kkdev92.Jev.DependencyInjection.csproj" />
+    <!-- The fake service the report's own tests run against. -->
+    <ProjectReference Include="../Kkdev92.Jev.TestSupport/Kkdev92.Jev.TestSupport.csproj" />
+  </ItemGroup>
+
+</Project>

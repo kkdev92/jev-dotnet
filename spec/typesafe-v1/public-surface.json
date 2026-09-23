@@ -1,0 +1,27 @@
+{
+  "$comment": [
+    "Allowlist of operations this SDK exposes publicly, identified by method and path.",
+    "Rules enforced by the generator:",
+    "  - an entry here that is absent from openapi.json is a generation FAILURE",
+    "  - an operation in openapi.json that is neither approved nor excluded is a generation FAILURE",
+    "  - changes to this file require human review: they widen or narrow the public surface",
+    "operationId is deliberately not used: the document's ids (systemone_v1_systemone_post) are generated",
+    "from the route, and the SDK's names should not depend on how the service generates them.",
+    "Verified against info.version 0.2.0 on 2026-09-23: 2 operations exist, 2 are approved."
+  ],
+  "operations": [
+    {
+      "method": "POST",
+      "path": "/v1/systemone",
+      "exposedAs": "JevClient.EvaluateAsync, JevClient.EvaluateContentAsync",
+      "constant": "SystemOne"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/models",
+      "exposedAs": "JevClient.GetModelsAsync",
+      "constant": "Models"
+    }
+  ],
+  "excluded": []
+}

@@ -1,0 +1,39 @@
+<Project>
+
+  <!--
+    Removes documentation for members a consumer cannot see, before the XML is packed.
+
+    The compiler documents whatever carries a /// comment, private fields included, and this
+    repository comments private members on purpose - the reasoning belongs next to the code it
+    explains. That reasoning then ships. Microsoft's own guidance on the switch says documenting
+    private members "exposes the inner (potentially confidential) workings of your library", and
+    there is no compiler option for it: -doc takes a file, not a visibility.
+
+    The work is in the codegen tool rather than in an inline task, because reading IL needs
+    System.Reflection.Metadata and an inline task compiles against a reference set that does
+    not include it - naming the implementation assembly instead drags System.Private.CoreLib into
+    the compilation, and the two do not mix. The tool is already the repository's build-time tool
+    and can reference whatever it likes.
+
+    Only on pack. A local build does not need it, and running it on every build of every project
+    would cost time for no benefit; what matters is what leaves the machine.
+  -->
+
+  <Target Name="FilterNonPublicDocumentation"
+          BeforeTargets="GenerateNuspec"
+          Condition="'$(IsPackable)' == 'true' AND '$(DocumentationFile)' != '' AND Exists('$(TargetDir)$(TargetName).xml')">
+
+    <PropertyGroup>
+      <_CodeGenProject>$(MSBuildThisFileDirectory)../src/tools/Kkdev92.Jev.CodeGen/Kkdev92.Jev.CodeGen.csproj</_CodeGenProject>
+    </PropertyGroup>
+
+    <!--
+      The copy next to the assembly, which is what the package picks up. The intermediate one is
+      left alone: rewriting it would make the next incremental build believe the compiler's own
+      output had already been filtered.
+    -->
+    <Exec Command="dotnet run --project &quot;$(_CodeGenProject)&quot; -c $(Configuration) -- filter-docs --documentation &quot;$(TargetDir)$(TargetName).xml&quot; --assembly &quot;$(TargetPath)&quot;"
+          StandardOutputImportance="normal" />
+  </Target>
+
+</Project>
