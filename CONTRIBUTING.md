@@ -236,8 +236,10 @@ recorded there.
 
 ## Releasing
 
-1. Version bump, `CHANGELOG.md` (move `[Unreleased]` under the new version, dated) and the README
-   status line, in a pull request. Merge it.
+1. Version bump, `CHANGELOG.md` (move `[Unreleased]` under the new version, dated), the README
+   status line and `PackageValidationBaselineVersion` in `src/Package.props` — the release before
+   this one, and none for the first — in a pull request. `ReleaseVersionTests` fails until the four
+   agree. Merge it.
 2. Dispatch `spec-check.yml` by hand. It compares the committed contract with TypeSafe's live
    document and opens an issue when they differ, and a difference is settled before the release,
    not after. It never runs on its own: TypeSafe's terms of use do not allow programs that monitor
@@ -251,9 +253,6 @@ recorded there.
    run beside it; it needs no key and costs nothing.
 5. Tag `vX.Y.Z` and push it.
 6. Approve the `release` environment.
-7. After the first release only: set `PackageValidationBaselineVersion` in
-   `src/Package.props` to the version just published. The build refuses to go past
-   `0.1.0` without it.
 
 Step 4 is the one that looks skippable. Everything else reads what TypeSafe *says* — the
 committed contract, and the live document `spec-check.yml` compares it with. None of it can see a
