@@ -96,9 +96,13 @@
         {
           "url": "https://docs.typesafe.ai/api",
           "says": "instructions: string | object | array, required"
+        },
+        {
+          "url": "Observed 2026-09-25 with an API key",
+          "says": "a noul question without instructions was answered with 200"
         }
       ],
-      "resolution": "Follow the OpenAPI document, which is what the service publishes as its own validation schema. The builder omits instructions for default(JevContent) and writes null for JevContent.Null. Not yet confirmed with an authenticated call.",
+      "resolution": "Follow the OpenAPI document, which is what the service publishes as its own validation schema and what the service was seen to accept. The builder omits instructions for default(JevContent) and writes null for JevContent.Null.",
       "checks": [
         { "pointer": "/components/schemas/NoulQuestion/required", "notContains": "instructions" },
         { "pointer": "/components/schemas/ChoiceQuestion/required", "notContains": "instructions" },
@@ -119,9 +123,13 @@
         {
           "url": "https://docs.typesafe.ai/api",
           "says": "A Score should have at least two levels"
+        },
+        {
+          "url": "Observed 2026-09-25 with an API key",
+          "says": "a one-level score was answered with 200: score 0.0, probability 1.0 on its only level"
         }
       ],
-      "resolution": "The SDK requires two (constant scoreLevelsMinimum). A one-level score cannot carry information.",
+      "resolution": "The SDK requires two (constant scoreLevelsMinimum). The service accepts one, but a one-level score can only ever answer that level, so it carries no information.",
       "checks": [
         { "pointer": "/components/schemas/ScoreQuestion/properties/criteria/minItems", "equals": 1 }
       ]
@@ -141,6 +149,10 @@
         {
           "url": "https://docs.typesafe.ai/primitives/score",
           "says": "a response whose legend values are objects with 'what' and 'examples'"
+        },
+        {
+          "url": "Observed 2026-09-25 with an API key",
+          "says": "levels sent as an object, an object and an array came back in the legend exactly as sent"
         }
       ],
       "resolution": "Legend values are held as JSON, never narrowed to strings.",
@@ -178,6 +190,10 @@
         {
           "url": "https://docs.typesafe.ai/api",
           "says": "a maximum of 255 options per Choice; the API accepts up to 10 levels"
+        },
+        {
+          "url": "Observed 2026-09-25 with an API key",
+          "says": "256 options and 11 levels were each refused with 400 and a plain string detail: 'Too many choices. Must have at most 255 choices.', 'Too many score levels. Must have at most 10 levels.'"
         }
       ],
       "resolution": "Enforced before sending, from the documented values (constants choiceOptionsMaximum and scoreLevelsMaximum). If the schema starts declaring them, the generator stops on the new keyword and the two are reconciled.",
@@ -203,6 +219,24 @@
       "checks": [
         { "pointer": "/paths/~1v1~1systemone/post/responses/401", "absent": true },
         { "pointer": "/paths/~1v1~1systemone/post/responses/403", "absent": true }
+      ]
+    },
+    {
+      "id": "status-400-undeclared",
+      "summary": "The service answers 400 for a request it understands but will not serve. Neither the OpenAPI document nor the HTTP reference lists 400.",
+      "sources": [
+        {
+          "url": "https://api.typesafe.ai/openapi.json",
+          "says": "responses 200 and 422 only"
+        },
+        {
+          "url": "Observed 2026-09-25 with an API key",
+          "says": "an unknown model: 400 {\"detail\":{\"error_type\":\"api_usage_error\",\"message\":...}}; too many options or levels: 400 with a string detail"
+        }
+      ],
+      "resolution": "400 is not retried: the same request would be refused again. api_usage_error is a known error type and appears in the exception message; the server's message, which names the model, does not.",
+      "checks": [
+        { "pointer": "/paths/~1v1~1systemone/post/responses/400", "absent": true }
       ]
     },
     {

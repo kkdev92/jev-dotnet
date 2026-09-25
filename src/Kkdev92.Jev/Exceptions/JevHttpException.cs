@@ -21,6 +21,7 @@ public sealed class JevHttpException : JevException
     private static readonly HashSet<string> KnownErrorTypes = new(StringComparer.Ordinal)
     {
         "authentication_error",
+        "api_usage_error",
     };
 
     internal JevHttpException(
@@ -53,8 +54,9 @@ public sealed class JevHttpException : JevException
     /// <remarks>
     /// Passed through as the service sent it, when it is lower-case letters, digits and underscores,
     /// so that code can branch on a value this SDK has not seen yet. Only values this SDK knows
-    /// appear in <see cref="Exception.Message"/>. The shape is observed, not documented: the OpenAPI
-    /// document describes only the 422 body.
+    /// appear in <see cref="Exception.Message"/>: <c>authentication_error</c> on a 401 or 403, and
+    /// <c>api_usage_error</c> on a 400 such as an unknown model. The shape is observed, not
+    /// documented: the OpenAPI document describes only the 422 body.
     /// </remarks>
     public string? ErrorType { get; }
 

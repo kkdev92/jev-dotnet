@@ -9,10 +9,9 @@ the contract.
 > "TypeSafe", "Jev" and "System One" are TypeSafe's names, used here only to identify the service
 > this package interoperates with.
 
-> **Pre-release, and not yet run against the live service with an API key.** Every call path is
-> exercised offline, against hand-written fakes of the HTTP API shaped after TypeSafe's OpenAPI
-> document, and the live endpoint has been checked only without a key. A few behaviours only a
-> keyed call can settle are listed under
+> **Pre-release.** Run against the live service with an API key, and exercised offline against
+> hand-written fakes of the HTTP API shaped after TypeSafe's OpenAPI document. What has not been
+> observed yet is listed under
 > [known limitations](https://github.com/kkdev92/jev-dotnet/blob/main/README.md#known-limitations).
 
 ## Why this exists

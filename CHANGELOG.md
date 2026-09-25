@@ -16,6 +16,19 @@ Dates are UTC, taken from when the packages went to nuget.org.
 
 ## [Unreleased]
 
+### Changed
+
+- `JevHttpException.Message` names `api_usage_error`, the error type TypeSafe sends with a `400`
+  for a request it will not serve, such as an unknown model. The server's own message, which names
+  the model, still stays out.
+
+### Notes
+
+- **Verified against the live service with an API key.** The live tests pass, and the `400`,
+  `401`, `403` and `422` bodies the service sends are the ones the SDK reads. A question without
+  `instructions` is accepted, structured score levels come back in the legend exactly as sent, and
+  over the documented limits the service answers `400`. `429` and `529` remain unobserved.
+
 ## [0.1.0-alpha] - 2026-09-23
 
 First public build. Generated from TypeSafe's OpenAPI document `3.1.0`, `info.version` `0.2.0`,

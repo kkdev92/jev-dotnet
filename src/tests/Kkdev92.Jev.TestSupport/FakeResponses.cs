@@ -40,6 +40,11 @@ public static class FakeResponses
         """{"detail":{"error_type":"authentication_error","message":"Must supply an API key! Check your request and try again."}}""",
         HttpStatusCode.Forbidden);
 
+    /// <summary>The observed body of a request naming a model that does not exist: status 400.</summary>
+    public static HttpResponseMessage UnknownModel() => Json(
+        """{"detail":{"error_type":"api_usage_error","message":"Unknown model: jev-does-not-exist"}}""",
+        HttpStatusCode.BadRequest);
+
     /// <summary>The observed body of a request with an invalid key: status 401.</summary>
     public static HttpResponseMessage InvalidKey() => Json(
         """{"detail":{"error_type":"authentication_error","message":"Cannot authenticate with the server. Please check your API key and try again."}}""",
