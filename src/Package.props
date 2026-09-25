@@ -27,7 +27,7 @@
   <!-- Package identity:
        the NuGet version axis is independent of the TypeSafe API version. -->
   <PropertyGroup>
-    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionPrefix>0.1.1</VersionPrefix>
     <VersionSuffix Condition="'$(VersionSuffix)' == ''">alpha</VersionSuffix>
     <Authors>kkdev92</Authors>
     <Company>kkdev92</Company>
@@ -55,17 +55,15 @@
     and pack compares the assemblies being built against it, so a binary breaking change fails the
     pack rather than waiting for a reviewer to spot it in a diff.
 
-    0.1.0-alpha is the first release, so there is nothing to compare against yet, and
-    LastVersionWithoutBaseline records that. Moving VersionPrefix past it without setting a
-    baseline stops the build with instructions, so the absence cannot quietly outlive the one
-    release it was meant for.
-
-    Until then, the approved public API snapshot in src/tests/PublicApi is the signal watching the
-    surface.
+    0.1.0-alpha was the first release and had nothing to compare against, which
+    LastVersionWithoutBaseline records. Moving VersionPrefix past it without setting a baseline
+    stops the build with instructions, so the absence cannot quietly outlive the one release it was
+    meant for. Each release's version bump moves the baseline to the release before it.
   -->
   <PropertyGroup>
     <EnablePackageValidation>true</EnablePackageValidation>
     <LastVersionWithoutBaseline>0.1.0</LastVersionWithoutBaseline>
+    <PackageValidationBaselineVersion>0.1.0-alpha</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <!--
