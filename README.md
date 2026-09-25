@@ -13,17 +13,14 @@ contract, not before.
 _Built for applications that make a decision from every call, and would rather a malformed answer
 failed loudly than turned into a default._
 
-> **Status:** `0.1.0-alpha`, the first release. **Nothing in it has yet been run against the live
-> service with an API key.** Every call path is exercised offline, against hand-written fakes of
-> the HTTP API shaped after TypeSafe's own OpenAPI document; the live endpoint has been checked only
-> without a key — the `401` and `403` bodies, the response headers, HTTP/2, the SDK reading the
-> refusal ([live-keyless.yml](.github/workflows/live-keyless.yml)) — because every authenticated
-> evaluation is billed.
+> **Status:** `0.1.0-alpha`, the first release. **Run against the live service with an API key on
+> 2026-09-25:** the live tests ([integration.yml](.github/workflows/integration.yml)) pass — every
+> question kind, a structured state, structured levels, a question without instructions, the model
+> list — and the `400`, `401`, `403` and `422` bodies the service sends are the ones the SDK reads.
 >
-> The live tests are written and run on demand ([integration.yml](.github/workflows/integration.yml)).
-> Until they have been run, the handful of behaviours only a keyed call can settle — listed under
-> [Known Limitations](#known-limitations) — are this SDK's reading of TypeSafe's documents, not an
-> observation.
+> Every call path is also exercised offline, against hand-written fakes of the HTTP API shaped after
+> TypeSafe's own OpenAPI document. What no call has shown yet — a real `429` or `529` — is listed
+> under [Known Limitations](#known-limitations).
 
 ---
 
@@ -338,25 +335,23 @@ every client it creates, and redacts header values unless told otherwise.
 
 ## Known Limitations
 
-- **Not yet verified with a key.** These follow TypeSafe's documents and have not been observed:
-  that a question without `instructions` is accepted (the OpenAPI document says so; the HTTP
-  reference says the field is required); what a legend returns for levels that are objects; that
-  both token counts always come back (a response without them is refused); the real bodies of
-  `422`, `429` and `529`, and whether `Retry-After` or `retry-after-ms` accompany them; the status
-  for a question over the documented limits; the precision of the probabilities
+- **Rate limiting and overload have not been seen.** The bodies of `429` and `529`, and whether
+  `Retry-After` or `retry-after-ms` accompany them, follow TypeSafe's documents rather than an
+  observation. What a keyed call has settled is recorded in `spec/typesafe-v1/semantics.json`
 - **The limits the SDK enforces are partly its own.** At most 255 choice options and 10 score
   levels are the HTTP reference's limits, which the OpenAPI document does not declare; at least two
-  levels is the HTTP reference's advice, where the OpenAPI document requires one. At least one
-  option per choice, 1,024 questions and 1 MiB of encoded questions per plan are this SDK's. A
+  levels is the HTTP reference's advice, where the OpenAPI document requires one and the service
+  accepts one. Past the limits the service answers `400`; the SDK refuses before sending. At least
+  one option per choice, 1,024 questions and 1 MiB of encoded questions per plan are this SDK's. A
   request under every local limit can still exceed the model's context, which is counted in tokens
   the SDK cannot count
 - **No streaming, no batching.** The API offers neither
 - **One target.** `net10.0` only; no multi-targeting is planned
 - **The consistency tolerance is provisional.** `1e-6` absolute and relative is this SDK's choice;
   TypeSafe's OpenAPI document says the probabilities sum to "approximately 1", and its HTTP
-  reference that they sum to 1; neither gives a precision. The live tests report the
-  deviations they see, and the tolerance will be set from those reports. Until then, `Report`
-  mode — the default — only warns
+  reference that they sum to 1; neither gives a precision. The first keyed run saw probabilities
+  with at most two decimals that summed to exactly 1, so nothing came near it. It stays provisional
+  until more runs are in, and `Report` mode — the default — only warns
 - **Exceptions cannot be constructed by callers.** To test your own error handling, answer with the
   status from a fake `HttpMessageHandler` — which also tests the mapping you depend on
 

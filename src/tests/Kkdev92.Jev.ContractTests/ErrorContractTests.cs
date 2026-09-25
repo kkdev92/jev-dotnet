@@ -48,6 +48,19 @@ public sealed class ErrorContractTests
     }
 
     [Fact]
+    public async Task AnUnknownModelIsABadRequestNamedByItsErrorType()
+    {
+        var exception = await Fails<JevHttpException>(new FakeHttpMessageHandler((_, _) => Task.FromResult(FakeResponses.UnknownModel())));
+
+        Assert.Equal(400, exception.StatusCode);
+        Assert.Equal("api_usage_error", exception.ErrorType);
+        Assert.Contains("api_usage_error", exception.Message, StringComparison.Ordinal);
+
+        // The server's sentence names the model, which the caller chose; it stays out.
+        Assert.DoesNotContain("jev-does-not-exist", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AValidationFailureCarriesItsCodesButNeverTheEchoedInput()
     {
         var exception = await Fails<JevHttpException>(new FakeHttpMessageHandler((_, _) => Task.FromResult(FakeResponses.ValidationFailed(StateSecret))));
