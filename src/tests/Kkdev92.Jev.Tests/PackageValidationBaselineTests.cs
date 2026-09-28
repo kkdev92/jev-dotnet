@@ -10,9 +10,9 @@ namespace Kkdev92.Jev.Tests;
 /// <para>
 /// <c>PackageValidationBaselineVersion</c> is what compares the assemblies being packed against
 /// the last version on nuget.org, so a binary breaking change fails the pack rather than reaching
-/// a consumer. 0.1.0-alpha is the first release and has nothing to compare against, so the
-/// baseline is absent and <c>LastVersionWithoutBaseline</c> records the one version that absence
-/// was decided for.
+/// a consumer. 0.1.0-alpha was the first release and had nothing to compare against;
+/// <c>LastVersionWithoutBaseline</c> records the one version that absence was decided for, and every
+/// release since names the one before it as the baseline.
 /// </para>
 /// <para>
 /// The risk is not the decision, it is inheriting it. A note in a comment saying "set this after
@@ -73,11 +73,7 @@ public sealed class PackageValidationBaselineTests
     /// state a release that deleted the line would be in.
     /// </para>
     /// <para>
-    /// Only the refusing direction is checked. The accepting direction needs a baseline that
-    /// resolves, and package validation restores it from nuget.org, so until 0.1.0-alpha is
-    /// published any version named there fails with <c>NU1102</c> instead — which would make a
-    /// check of that direction pass or fail for reasons unrelated to the guard. Once it is
-    /// published, add the build that names it and expects success.
+    /// The accepting direction is <see cref="PastTheExemptionTheGuardAdmitsABaseline"/>.
     /// </para>
     /// <para>
     /// <c>--no-restore</c>, so the probe cannot rewrite the assets file the real build uses, and a
@@ -96,7 +92,40 @@ public sealed class PackageValidationBaselineTests
         Assert.Contains("no PackageValidationBaselineVersion is set", output, StringComparison.Ordinal);
     }
 
-    private static async Task<(int ExitCode, string Output)> BuildAsync(string project, params string[] arguments)
+    /// <summary>
+    /// With a baseline set, a version past the exemption goes through the guard.
+    /// </summary>
+    /// <remarks>
+    /// Only the guard's target runs, not a build. A build would restore the baseline package from
+    /// nuget.org and compile into the intermediate folder the real build uses, and neither says
+    /// anything about the guard: its condition is what decides. Run for a version past the
+    /// exemption with the baseline <c>src/Package.props</c> sets, the target has to be skipped and
+    /// the run has to end cleanly — a guard that refused every version past the exemption, baseline
+    /// or not, would fail here and nowhere else.
+    /// </remarks>
+    [Fact]
+    public async Task PastTheExemptionTheGuardAdmitsABaseline()
+    {
+        var project = Path.Combine(RepositoryRoot.Value, "src", "Kkdev92.Jev", "Kkdev92.Jev.csproj");
+
+        var (exitCode, output) = await DotnetAsync(
+            "msbuild", project, "-t:RequireAPackageValidationBaseline", "-p:VersionPrefix=99.0.0");
+
+        Assert.True(exitCode == 0, output);
+        Assert.DoesNotContain("no PackageValidationBaselineVersion is set", output, StringComparison.Ordinal);
+    }
+
+    private static Task<(int ExitCode, string Output)> BuildAsync(string project, params string[] arguments)
+        => DotnetAsync(
+            "build",
+            project,
+            [
+                "--no-restore",
+                "-p:BaseOutputPath=" + Path.Combine(Path.GetTempPath(), "jev-baseline-probe") + Path.DirectorySeparatorChar,
+                .. arguments,
+            ]);
+
+    private static async Task<(int ExitCode, string Output)> DotnetAsync(string command, string project, params string[] arguments)
     {
         var start = new ProcessStartInfo("dotnet")
         {
@@ -105,10 +134,8 @@ public sealed class PackageValidationBaselineTests
             WorkingDirectory = RepositoryRoot.Value,
         };
 
-        start.ArgumentList.Add("build");
+        start.ArgumentList.Add(command);
         start.ArgumentList.Add(project);
-        start.ArgumentList.Add("--no-restore");
-        start.ArgumentList.Add("-p:BaseOutputPath=" + Path.Combine(Path.GetTempPath(), "jev-baseline-probe") + Path.DirectorySeparatorChar);
 
         foreach (var argument in arguments)
         {
