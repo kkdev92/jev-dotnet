@@ -14,9 +14,10 @@ _Built for applications that make a decision from every call, and would rather a
 failed loudly than turned into a default._
 
 > **Status:** `0.1.1-alpha`. **Run against the live service with an API key on 2026-09-25:** the
-> live tests ([integration.yml](.github/workflows/integration.yml)) pass — every question kind, a
-> structured state, structured levels, a question without instructions, the model list — and the
-> `400`, `401`, `403` and `422` bodies the service sends are the ones the SDK reads.
+> live tests ([`Kkdev92.Jev.IntegrationTests`](src/tests/Kkdev92.Jev.IntegrationTests), run
+> locally) pass — every question kind, a structured state, structured levels, a question without
+> instructions, the model list — and the `400`, `401`, `403` and `422` bodies the service sends are
+> the ones the SDK reads.
 >
 > Every call path is also exercised offline, against hand-written fakes of the HTTP API shaped after
 > TypeSafe's own OpenAPI document. What no call has shown yet — a real `429` or `529` — is listed

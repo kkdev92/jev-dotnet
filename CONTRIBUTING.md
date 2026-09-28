@@ -247,10 +247,19 @@ recorded there.
 3. Dispatch `release.yml` by hand. A manual run is always a dry run — it builds, verifies and packs,
    and stops before every publishing job. Tags here are immutable, so a pipeline that fails after
    the tag exists costs a version number.
-4. Dispatch `integration.yml` by hand, with the `JEV_DOTNET_INTEGRATION_API_KEY` secret. This is
-   the only check that sees a real answer, and it is billed: three small evaluations and a model
-   listing per run. Read the report in the run summary, not only the tick. `live-keyless.yml` can
-   run beside it; it needs no key and costs nothing.
+4. Run the keyed live tests. This is the only check that sees a real answer, and it is billed:
+   three small evaluations and a model listing per run. They run locally, with the key in
+   `JEV_DOTNET_INTEGRATION_API_KEY` and a path for the report in `JEV_DOTNET_LIVE_REPORT`:
+
+   ```bash
+   dotnet test --project src/tests/Kkdev92.Jev.IntegrationTests -c Release -- --filter-trait Category=Integration
+   ```
+
+   Without a key they skip rather than fail, so check that none was skipped, and read the report,
+   not only the pass count. `integration.yml` runs the same tests on Actions when the key is an
+   `integration` environment secret, and fails rather than skips without it. The keyless checks
+   (`JEV_DOTNET_KEYLESS_LIVE=1`, or `live-keyless.yml`) can run beside them; they need no key and
+   cost nothing.
 5. Tag `vX.Y.Z` and push it.
 6. Approve the `release` environment.
 
