@@ -14,7 +14,8 @@
     nothing and skips everything, which without this would fail every incremental build.
 
     The counters arrived in MSBuild 17.13 / .NET SDK 9.0.200, and are not set by static graph
-    restore. The emptiness guard keeps the target inert rather than erroring if either is absent.
+    restore. If any of them is missing, the first check fails the build and says so, rather than
+    leaving the audit unverified.
   -->
   <Target Name="AssertRestoreAuditedEveryProject" AfterTargets="Restore" Condition="'$(CI)' == 'true'">
     <Error Condition="'$(RestoreProjectCount)' == '' or '$(RestoreProjectsAuditedCount)' == '' or '$(RestoreSkippedCount)' == ''"

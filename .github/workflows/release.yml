@@ -79,7 +79,7 @@ jobs:
             -c Release -p:PublishAot=true -o artifacts/aot
           ./artifacts/aot/Kkdev92.Jev.AotSmokeTests
 
-      # A tag says one version and Directory.Build.props says another, and only one of them ends
+      # A tag says one version and src/Package.props says another, and only one of them ends
       # up on nuget.org — permanently, because a published version cannot be replaced. So they are
       # required to agree before packing or publishing.
       - name: Check the tag against the package version
