@@ -13,7 +13,7 @@ contract, not before.
 _Built for applications that make a decision from every call, and would rather a malformed answer
 failed loudly than turned into a default._
 
-> **Status:** `0.1.1-alpha`. **Run against the live service with an API key on 2026-09-25:** the
+> **Status:** `0.1.2-alpha`. **Run against the live service with an API key on 2026-09-25:** the
 > live tests ([`Kkdev92.Jev.IntegrationTests`](src/tests/Kkdev92.Jev.IntegrationTests), run
 > locally) pass — every question kind, a structured state, structured levels, a question without
 > instructions, the model list — and the `400`, `401`, `403` and `422` bodies the service sends are
