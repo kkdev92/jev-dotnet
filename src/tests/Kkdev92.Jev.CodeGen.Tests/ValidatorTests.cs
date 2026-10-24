@@ -17,7 +17,7 @@ public sealed class ValidatorTests
         var validated = Validate(SpecFixture.Committed());
 
         Assert.Equal(["GET /v1/models", "POST /v1/systemone"], validated.Operations.Select(o => o.Definition.Key.ToString()));
-        Assert.Equal(16, validated.ReachableSchemas.Count);
+        Assert.Equal(17, validated.ReachableSchemas.Count);
         Assert.Empty(validated.Warnings);
     }
 

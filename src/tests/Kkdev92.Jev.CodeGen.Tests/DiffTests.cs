@@ -84,7 +84,12 @@ public sealed class DiffTests
     [Fact]
     public void AKindTheServiceStopsAcceptingBreaksTheSender()
     {
-        var report = Diff(d => d.Property("SystemOneRequest", "state")["anyOf"]!.AsArray().RemoveAt(2));
+        // x-accepts restates the kinds, so a service that stops accepting one says so in both places.
+        var report = Diff(d =>
+        {
+            d.Property("SystemOneRequest", "state")["anyOf"]!.AsArray().RemoveAt(2);
+            d.Property("SystemOneRequest", "state")["x-accepts"] = "string | object";
+        });
 
         Assert.Contains(report.Breaking, l => l.Contains("SystemOneRequest.state no longer admits Array", StringComparison.Ordinal));
     }
@@ -117,7 +122,7 @@ public sealed class DiffTests
     [Fact]
     public void SomethingTheGeneratorCannotReadIsReportedAsPotentiallyBreaking()
     {
-        var report = Diff(d => d.Property("ScoreQuestion", "criteria")["maxItems"] = 10);
+        var report = Diff(d => d.Property("ModelMetadata", "release_date")["format"] = "date");
 
         Assert.Contains(report.Breaking, l => l.Contains("does not interpret", StringComparison.Ordinal));
         Assert.Contains(report.Lines(), l => l.StartsWith("Potentially breaking (1):", StringComparison.Ordinal));

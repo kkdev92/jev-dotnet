@@ -6,7 +6,8 @@
     "on the wire, dated), decision (nothing upstream settles it; this SDK chose, and the note says why).",
     "conflicts record where TypeSafe's own descriptions of the API differ. Each carries checks against openapi.json: if a later",
     "snapshot stops saying what a resolution relies on, generation stops and the resolution has to be revisited.",
-    "Everything here was verified on 2026-09-23 against info.version 0.2.0."
+    "Everything here was verified on 2026-09-23 against info.version 0.2.0. The base address, the choice and score limits and",
+    "status 400 were revisited on 2026-10-24, when the snapshot retrieved that day (still info.version 0.2.0) began to declare them."
   ],
   "constants": [
     {
@@ -14,9 +15,10 @@
       "value": "https://api.typesafe.ai",
       "basis": "documented",
       "sources": [
-        "https://docs.typesafe.ai/api"
+        "https://docs.typesafe.ai/api",
+        "https://api.typesafe.ai/openapi.json"
       ],
-      "note": "The origin every documented request goes to."
+      "note": "The origin every documented request goes to, and the one server the OpenAPI document names (servers, since the snapshot retrieved 2026-10-24). The generator stops if the document names any other."
     },
     {
       "name": "defaultModel",
@@ -33,15 +35,16 @@
       "basis": "documented",
       "sources": [
         "https://docs.typesafe.ai/api",
-        "https://docs.typesafe.ai/primitives/choice"
+        "https://docs.typesafe.ai/primitives/choice",
+        "https://api.typesafe.ai/openapi.json"
       ],
-      "note": "'You can have a maximum of 255 options per Choice.' The OpenAPI document declares no maximum; see the conflict limits-outside-the-schema."
+      "note": "'You can have a maximum of 255 options per Choice.' The OpenAPI document declares the same maximum since the snapshot retrieved 2026-10-24; see the conflict choice-and-score-limits."
     },
     {
       "name": "choiceOptionsMinimum",
       "value": 1,
       "basis": "decision",
-      "note": "No source states a minimum. Zero options can never produce an answer, so they are refused; one is the smallest request nothing rules out, and is accepted even though it can only ever select itself."
+      "note": "No source states a minimum. Zero options can never produce an answer, so they are refused; one is the smallest request nothing rules out, and is accepted even though it can only ever select itself. The OpenAPI document declares minProperties 1 since the snapshot retrieved 2026-10-24, which agrees."
     },
     {
       "name": "scoreLevelsMaximum",
@@ -49,9 +52,10 @@
       "basis": "documented",
       "sources": [
         "https://docs.typesafe.ai/api",
-        "https://docs.typesafe.ai/primitives/score"
+        "https://docs.typesafe.ai/primitives/score",
+        "https://api.typesafe.ai/openapi.json"
       ],
-      "note": "'A Score should have at least two levels; the API accepts up to 10.' The OpenAPI document declares no maximum."
+      "note": "'A Score should have at least two levels; the API accepts up to 10.' The OpenAPI document declares the same maximum since the snapshot retrieved 2026-10-24; see the conflict choice-and-score-limits."
     },
     {
       "name": "scoreLevelsMinimum",
@@ -180,12 +184,12 @@
       ]
     },
     {
-      "id": "limits-outside-the-schema",
-      "summary": "The HTTP reference limits a Choice to 255 options and a Score to 10 levels. The OpenAPI document declares neither limit.",
+      "id": "choice-and-score-limits",
+      "summary": "The HTTP reference limits a Choice to 255 options and a Score to 10 levels. The OpenAPI document declared neither limit until the snapshot retrieved 2026-10-24, which declares both with the same values.",
       "sources": [
         {
           "url": "https://api.typesafe.ai/openapi.json",
-          "says": "no maxProperties on ChoiceQuestion.criteria, no maxItems on ScoreQuestion.criteria"
+          "says": "maxProperties 255 on ChoiceQuestion.criteria and maxItems 10 on ScoreQuestion.criteria, since the snapshot retrieved 2026-10-24; neither before"
         },
         {
           "url": "https://docs.typesafe.ai/api",
@@ -196,10 +200,10 @@
           "says": "256 options and 11 levels were each refused with 400 and a plain string detail: 'Too many choices. Must have at most 255 choices.', 'Too many score levels. Must have at most 10 levels.'"
         }
       ],
-      "resolution": "Enforced before sending, from the documented values (constants choiceOptionsMaximum and scoreLevelsMaximum). If the schema starts declaring them, the generator stops on the new keyword and the two are reconciled.",
+      "resolution": "Enforced before sending, from the documented values (constants choiceOptionsMaximum and scoreLevelsMaximum). The document now states the same two values. The checks pin them, and the generator reads a maximum only where a check pins it, so a change to either value stops generation until the constants are revisited.",
       "checks": [
-        { "pointer": "/components/schemas/ChoiceQuestion/properties/criteria/maxProperties", "absent": true },
-        { "pointer": "/components/schemas/ScoreQuestion/properties/criteria/maxItems", "absent": true }
+        { "pointer": "/components/schemas/ChoiceQuestion/properties/criteria/maxProperties", "equals": 255 },
+        { "pointer": "/components/schemas/ScoreQuestion/properties/criteria/maxItems", "equals": 10 }
       ]
     },
     {
@@ -222,21 +226,23 @@
       ]
     },
     {
-      "id": "status-400-undeclared",
-      "summary": "The service answers 400 for a request it understands but will not serve. Neither the OpenAPI document nor the HTTP reference lists 400.",
+      "id": "status-400",
+      "summary": "The service answers 400 for a request it understands but will not serve. The HTTP reference does not list 400. The OpenAPI document did not either until the snapshot retrieved 2026-10-24, which declares it with a detail that is a string or an object, the two shapes observed.",
       "sources": [
         {
           "url": "https://api.typesafe.ai/openapi.json",
-          "says": "responses 200 and 422 only"
+          "says": "responses 200, 400 (HTTPBadRequestError, whose detail is a string or an object) and 422, since the snapshot retrieved 2026-10-24; 200 and 422 only before"
         },
         {
           "url": "Observed 2026-09-25 with an API key",
           "says": "an unknown model: 400 {\"detail\":{\"error_type\":\"api_usage_error\",\"message\":...}}; too many options or levels: 400 with a string detail"
         }
       ],
-      "resolution": "400 is not retried: the same request would be refused again. api_usage_error is a known error type and appears in the exception message; the server's message, which names the model, does not.",
+      "resolution": "400 is not retried: the same request would be refused again. api_usage_error is a known error type and appears in the exception message; the server's message, which names the model, does not. The declared detail is what the error reader already takes apart: an object yields its error type, a string yields nothing.",
       "checks": [
-        { "pointer": "/paths/~1v1~1systemone/post/responses/400", "absent": true }
+        { "pointer": "/paths/~1v1~1systemone/post/responses/400", "present": true },
+        { "pointer": "/components/schemas/HTTPBadRequestError/properties/detail/anyOf", "contains": { "type": "string" } },
+        { "pointer": "/components/schemas/HTTPBadRequestError/properties/detail/anyOf", "contains": { "additionalProperties": true, "type": "object" } }
       ]
     },
     {

@@ -9,17 +9,17 @@
   ],
   "contract": "typesafe-v1",
   "source": "https://api.typesafe.ai/openapi.json",
-  "retrievedAtUtc": "2026-09-22T21:48:59Z",
+  "retrievedAtUtc": "2026-10-24T06:49:38Z",
   "openapi": "3.1.0",
   "title": "TypeSafe",
   "infoVersion": "0.2.0",
   "upstream": {
-    "sha256": "a191f8a7df6bd6fedced8120dd0fd106f88575d1d1c8360d08900a6c7c0360d5",
-    "byteLength": 14158
+    "sha256": "3ca93b6e6b9aa8d7820531b78c66ed7a9798b11e6e163ad96b140fb3d75fbcf4",
+    "byteLength": 22467
   },
   "snapshot": {
     "file": "openapi.json",
-    "sha256": "167e85e6636569ca7e303290bce60bdb7ea9cc416ef830b087f4930891d852f6",
-    "byteLength": 12423
+    "sha256": "8b0cfc1cc772be7da4ef5a15254d9d40d9784af0d7f29a73265dd23379f4cddd",
+    "byteLength": 17927
   }
 }

@@ -18,14 +18,24 @@ Dates are UTC, taken from when the packages went to nuget.org.
 
 ## [0.1.2-alpha] - 2026-10-24
 
-Generated from the same TypeSafe contract as 0.1.0-alpha and 0.1.1-alpha: OpenAPI document `3.1.0`,
-`info.version` `0.2.0` (document SHA-256 `a191f8a7…c0360d5`, contract SHA-256
-`167e85e6…91d852f6`). The public surface is unchanged; only a dependency floor moves.
+Generated from a newer snapshot of TypeSafe's contract: OpenAPI document `3.1.0`, `info.version`
+`0.2.0` (document SHA-256 `3ca93b6e…75fbcf4`, contract SHA-256 `8b0cfc1c…79f4cddd`). The public
+surface is unchanged.
 
 ### Changed
 
 - `Kkdev92.Jev.DependencyInjection` depends on `Microsoft.Extensions.Http` and
   `Microsoft.Extensions.Options` 10.0.13 or later, up from 10.0.12.
+
+### Notes
+
+- The newer document describes box questions, images sent with a request, and two opt-in headers
+  for those and for long context. This SDK implements none of them: it never sends them, and a box
+  answer is refused like any answer of a type it does not know
+- The document now also declares the limits the SDK already enforced (at most 255 choice options,
+  at least one, and at most 10 score levels) and the `400` the service was already seen to answer.
+  What the SDK sends and how it reads answers and errors are what 0.1.1-alpha shipped, and this
+  release was not run against the service with a key
 
 ## [0.1.1-alpha] - 2026-09-25
 

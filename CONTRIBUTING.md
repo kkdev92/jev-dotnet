@@ -103,8 +103,10 @@ codegen verify    prove the checked-in sources are current     (offline)
 
 `dotnet run --project src/tools/Kkdev92.Jev.CodeGen -c Release -- <command>`. A new operation
 stops generation until `public-surface.json` approves or excludes it, and a change that invalidates
-a resolution in `semantics.json` stops it until the resolution is revisited. Changes to either file
-always need human review: they widen or narrow what the SDK promises.
+a resolution in `semantics.json` stops it until the resolution is revisited. A part of an approved
+operation that the SDK does not implement is listed in `public-surface.json` under `omitted`, as it
+was when that was decided; if the document changes that part, generation stops again. Changes to
+either file always need human review: they widen or narrow what the SDK promises.
 
 ## Changing the public API
 

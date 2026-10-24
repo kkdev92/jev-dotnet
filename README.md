@@ -340,12 +340,16 @@ every client it creates, and redacts header values unless told otherwise.
   `Retry-After` or `retry-after-ms` accompany them, follow TypeSafe's documents rather than an
   observation. What a keyed call has settled is recorded in `spec/typesafe-v1/semantics.json`
 - **The limits the SDK enforces are partly its own.** At most 255 choice options and 10 score
-  levels are the HTTP reference's limits, which the OpenAPI document does not declare; at least two
-  levels is the HTTP reference's advice, where the OpenAPI document requires one and the service
-  accepts one. Past the limits the service answers `400`; the SDK refuses before sending. At least
-  one option per choice, 1,024 questions and 1 MiB of encoded questions per plan are this SDK's. A
-  request under every local limit can still exceed the model's context, which is counted in tokens
-  the SDK cannot count
+  levels, and at least one option per choice, are what TypeSafe's OpenAPI document declares, and the
+  HTTP reference states the same maxima; at least two levels is the HTTP reference's advice, where
+  the OpenAPI document requires one and the service accepts one. Past the limits the service answers
+  `400`; the SDK refuses before sending. 1,024 questions and 1 MiB of encoded questions per plan are
+  this SDK's. A request under every local limit can still exceed the model's context, which is
+  counted in tokens the SDK cannot count
+- **No box questions, images or long context.** TypeSafe's OpenAPI document describes a box
+  question, images sent with a request, and two opt-in headers for those and for long context. This
+  SDK sends none of them, and refuses a box answer like any answer of a type it does not know. What
+  is left out, and why, is listed in `spec/typesafe-v1/public-surface.json`
 - **No streaming, no batching.** The API offers neither
 - **One target.** `net10.0` only; no multi-targeting is planned
 - **The consistency tolerance is provisional.** `1e-6` absolute and relative is this SDK's choice;
@@ -369,7 +373,7 @@ commit and review                 the contract is a reviewable file
         v
 offline generator                 allowlist, recorded conflicts, fail-closed on anything unknown
         v
-generated wire types (internal)   18 files, compared byte for byte in CI
+generated wire types (internal)   19 files, compared byte for byte in CI
         v
 handwritten runtime               plans, the response reader, deadline, retry, errors
 ```
@@ -393,7 +397,7 @@ taken, and the generator stops if a later contract no longer says what a decisio
 | Native AOT | supported and exercised in CI on a real consumer application |
 | Trimming | `IsAotCompatible`; the trim and AOT analyzers report no warnings |
 | SDK (to build) | exactly the version in `global.json`; `rollForward: disable` |
-| TypeSafe API | OpenAPI `3.1.0`, `info.version` `0.2.0`, contract extracted 2026-09-22 |
+| TypeSafe API | OpenAPI `3.1.0`, `info.version` `0.2.0`, contract extracted 2026-10-24 |
 
 The TypeSafe API version and this package's version are **independent axes**.
 

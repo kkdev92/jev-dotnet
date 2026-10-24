@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Kkdev92.Jev.CodeGen.IntermediateModel;
 using Kkdev92.Jev.CodeGen.Normalization;
 using Kkdev92.Jev.CodeGen.Specifications;
@@ -13,13 +14,17 @@ namespace Kkdev92.Jev.CodeGen.OpenApi;
 /// This is not a general OpenAPI generator and does not try to be one. It understands the
 /// keywords the TypeSafe document uses today — objects with properties, maps, arrays,
 /// <c>anyOf</c> over value kinds, a nullable reference, a discriminated <c>oneOf</c>,
-/// <c>minItems</c> and <c>minProperties</c> — and fails closed on everything else.
+/// <c>minItems</c> and <c>minProperties</c>, the one server the runtime sends to — and fails
+/// closed on everything else.
 /// </para>
 /// <para>
-/// Failing closed is the point. If a later snapshot adds <c>maxItems: 10</c> to the score criteria,
-/// the right outcome is a generator that stops and a maintainer who decides what the SDK does with
-/// it, not a generator that drops the keyword and reports success. Annotations that cannot change
-/// the shape of the wire — titles, descriptions, examples — are read past and never emitted.
+/// Failing closed is the point. If a snapshot adds <c>maxItems: 10</c> to the score criteria, the
+/// right outcome is a generator that stops and a maintainer who decides what the SDK does with it,
+/// not a generator that drops the keyword and reports success. Once decided, the decision is
+/// written down where the generator can hold the document to it: a maximum is read where
+/// <c>semantics.json</c> pins its value, and a feature the SDK does not implement is named, as it
+/// was, in <c>public-surface.json</c>. Annotations that cannot change the shape of the wire —
+/// titles, descriptions, examples — are read past and never emitted.
 /// </para>
 /// </remarks>
 internal static class OpenApiParser
@@ -38,10 +43,11 @@ internal static class OpenApiParser
 
     public static ApiContract Parse(SpecSnapshot snapshot)
     {
-        using var document = JsonDocument.Parse(snapshot.CanonicalBytes, new JsonDocumentOptions { AllowDuplicateProperties = false });
+        var bytes = WithoutOmittedParts(snapshot.CanonicalBytes, snapshot.PublicSurface.Omitted);
+        using var document = JsonDocument.Parse(bytes, new JsonDocumentOptions { AllowDuplicateProperties = false });
         var root = document.RootElement;
 
-        Expect(root, "#", allowed: ["openapi", "info", "paths", "components"]);
+        Expect(root, "#", allowed: ["openapi", "info", "servers", "paths", "components"]);
 
         var openApi = String(root, "openapi", "#");
 
@@ -53,12 +59,14 @@ internal static class OpenApiParser
         var info = root.GetProperty("info");
         Expect(info, "#/info", allowed: ["title", "description", "version"]);
 
+        ParseServers(root, snapshot.Semantics.Constants);
+
         var components = root.GetProperty("components");
         Expect(components, "#/components", allowed: ["schemas", "securitySchemes"]);
 
         var securitySchemes = ParseSecuritySchemes(components);
         var operations = ParseOperations(root.GetProperty("paths"), securitySchemes);
-        var schemas = ParseSchemas(components.GetProperty("schemas"), snapshot.NamingOverrides);
+        var schemas = ParseSchemas(components.GetProperty("schemas"), snapshot.NamingOverrides, PinnedMaxima(snapshot.Semantics));
 
         return new ApiContract(
             snapshot.Contract,
@@ -69,6 +77,100 @@ internal static class OpenApiParser
             operations,
             schemas,
             snapshot.Semantics.Constants);
+    }
+
+    /// <summary>
+    /// The document without the parts <c>public-surface.json</c> leaves out. Each must be there
+    /// exactly as recorded. Leaving out a discriminator mapping entry leaves out its <c>oneOf</c>
+    /// branch with it, so the union is read as one member shorter.
+    /// </summary>
+    private static byte[] WithoutOmittedParts(byte[] canonical, IReadOnlyList<OmittedPart> omitted)
+    {
+        if (omitted.Count == 0)
+        {
+            return canonical;
+        }
+
+        var root = JsonNode.Parse(canonical)!.AsObject();
+
+        foreach (var part in omitted)
+        {
+            var segments = PointerSegments(part.Pointer);
+            JsonNode? parent = root;
+
+            foreach (var segment in segments[..^1])
+            {
+                parent = parent is JsonObject o && o.TryGetPropertyValue(segment, out var next) ? next : null;
+            }
+
+            if (parent is not JsonObject owner || !owner.TryGetPropertyValue(segments[^1], out var value))
+            {
+                throw new InvalidDataException($"{PublicSurface.FileName} omits {part.Pointer}, which the document does not have. Remove the stale entry.");
+            }
+
+            if (!JsonElement.DeepEquals(JsonSerializer.SerializeToElement(value), part.Value))
+            {
+                throw new InvalidDataException($"{PublicSurface.FileName} omits {part.Pointer} as it was when that was decided, and the document now has something else there. Decide again.");
+            }
+
+            owner.Remove(segments[^1]);
+
+            if (segments is ["components", "schemas", var union, "discriminator", "mapping", _])
+            {
+                var branches = root["components"]!["schemas"]![union]!["oneOf"]!.AsArray();
+                var branch = branches.SingleOrDefault(b => b?["$ref"]?.GetValue<string>() == value?.GetValue<string>())
+                    ?? throw new InvalidDataException($"{PublicSurface.FileName} omits {part.Pointer}, and '{union}' has no oneOf branch for it.");
+
+                branches.Remove(branch);
+            }
+        }
+
+        return JsonSerializer.SerializeToUtf8Bytes(root);
+    }
+
+    /// <summary>The segments of an RFC 6901 pointer that names an object member.</summary>
+    private static string[] PointerSegments(string pointer)
+        => pointer.Length > 1 && pointer[0] == '/'
+            ? pointer[1..].Split('/').Select(s => s.Replace("~1", "/", StringComparison.Ordinal).Replace("~0", "~", StringComparison.Ordinal)).ToArray()
+            : throw new InvalidDataException($"'{pointer}' is not a JSON pointer to a member.");
+
+    /// <summary>Pointers to a <c>maxItems</c> or <c>maxProperties</c> whose value <c>semantics.json</c> pins with an <c>equals</c> check.</summary>
+    private static HashSet<string> PinnedMaxima(Semantics semantics)
+        => semantics.Conflicts
+            .SelectMany(c => c.Checks)
+            .Where(c => c.Operator == "equals"
+                && (c.Pointer.EndsWith("/maxItems", StringComparison.Ordinal) || c.Pointer.EndsWith("/maxProperties", StringComparison.Ordinal)))
+            .Select(c => c.Pointer)
+            .ToHashSet(StringComparer.Ordinal);
+
+    private static void ParseServers(JsonElement root, IReadOnlyList<SemanticConstant> constants)
+    {
+        if (!root.TryGetProperty("servers", out var servers))
+        {
+            return;
+        }
+
+        // The runtime sends every request to the defaultBaseAddress constant, not to whatever the
+        // document lists. A document naming exactly that origin agrees with the code that ships; any
+        // other server, a second one or a templated one would mean requests belong somewhere the
+        // runtime does not send them, so generation stops until the constant is revisited.
+        var expected = constants.SingleOrDefault(c => c.Name == "defaultBaseAddress")?.StringValue
+            ?? throw new InvalidDataException("semantics.json has no string constant 'defaultBaseAddress' to compare #/servers with.");
+
+        if (servers.ValueKind != JsonValueKind.Array || servers.GetArrayLength() != 1)
+        {
+            throw Unsupported("#/servers", $"a server list that is not exactly one entry. The runtime sends every request to {expected}.");
+        }
+
+        var server = servers[0];
+        Expect(server, "#/servers/0", allowed: ["url"]);
+
+        var url = String(server, "url", "#/servers/0");
+
+        if (!string.Equals(url, expected, StringComparison.Ordinal))
+        {
+            throw Unsupported("#/servers/0/url", $"the server '{Naming.Printable(url)}'. The runtime sends every request to {expected} (defaultBaseAddress in semantics.json).");
+        }
     }
 
     private static HashSet<string> ParseSecuritySchemes(JsonElement components)
@@ -196,7 +298,7 @@ internal static class OpenApiParser
         return SchemaName(String(schema, "$ref", location), location);
     }
 
-    private static List<SchemaDef> ParseSchemas(JsonElement schemas, NamingOverrides overrides)
+    private static List<SchemaDef> ParseSchemas(JsonElement schemas, NamingOverrides overrides, IReadOnlySet<string> pinnedMaxima)
     {
         var result = new List<SchemaDef>();
         var unions = new Dictionary<string, (string Union, string Tag)>(StringComparer.Ordinal);
@@ -236,7 +338,8 @@ internal static class OpenApiParser
                 schema.Value,
                 CSharpTypeName(schema.Name, overrides),
                 membership.Union,
-                membership.Tag));
+                membership.Tag,
+                pinnedMaxima));
         }
 
         foreach (var name in overrides.Schemas.Keys)
@@ -285,7 +388,7 @@ internal static class OpenApiParser
         return new UnionSchemaDef(name, csharpName, propertyName, members);
     }
 
-    private static ObjectSchemaDef ParseObject(string name, JsonElement schema, string csharpName, string? union, string? tag)
+    private static ObjectSchemaDef ParseObject(string name, JsonElement schema, string csharpName, string? union, string? tag, IReadOnlySet<string> pinnedMaxima)
     {
         var location = $"#/components/schemas/{name}";
         Expect(schema, location, allowed: ["type", "properties", "required"]);
@@ -305,7 +408,7 @@ internal static class OpenApiParser
         foreach (var property in properties.EnumerateObject())
         {
             var propertyLocation = $"{location}/properties/{Escape(property.Name)}";
-            var type = ParseType(property.Value, propertyLocation);
+            var type = ParseType(property.Value, propertyLocation, pinnedMaxima);
             var propertyName = Naming.ToPascalCase(property.Name);
 
             if (!csharpNames.Add(propertyName) || propertyName == csharpName)
@@ -342,14 +445,19 @@ internal static class OpenApiParser
     }
 
     /// <summary>The type of a property, an item or a map value.</summary>
-    internal static TypeRef ParseType(JsonElement schema, string location)
+    internal static TypeRef ParseType(JsonElement schema, string location, IReadOnlySet<string> pinnedMaxima)
     {
         if (schema.ValueKind != JsonValueKind.Object)
         {
             throw Unsupported(location, $"a schema of kind {schema.ValueKind}.");
         }
 
-        var keys = schema.EnumerateObject().Select(p => p.Name).Where(k => !Annotations.Contains(k)).ToHashSet(StringComparer.Ordinal);
+        if (schema.TryGetProperty("x-accepts", out var accepts))
+        {
+            ExpectAcceptsMatchesAnyOf(schema, accepts, location);
+        }
+
+        var keys = schema.EnumerateObject().Select(p => p.Name).Where(k => !Annotations.Contains(k) && k != "x-accepts").ToHashSet(StringComparer.Ordinal);
 
         if (keys.Count == 0)
         {
@@ -366,7 +474,7 @@ internal static class OpenApiParser
         if (keys.Contains("anyOf"))
         {
             Only(keys, location, "anyOf");
-            return ParseAnyOf(schema.GetProperty("anyOf"), location);
+            return ParseAnyOf(schema.GetProperty("anyOf"), location, pinnedMaxima);
         }
 
         if (keys.Contains("const"))
@@ -397,7 +505,8 @@ internal static class OpenApiParser
 
             case "object":
                 {
-                    Only(keys, location, "type", "additionalProperties", "minProperties");
+                    Only(keys, location, "type", "additionalProperties", "minProperties", "maxProperties");
+                    ExpectPinnedMaximum(keys, "maxProperties", location, pinnedMaxima);
 
                     if (!schema.TryGetProperty("additionalProperties", out var additional)
                         || additional.ValueKind == JsonValueKind.True
@@ -416,15 +525,16 @@ internal static class OpenApiParser
                         throw Unsupported(location + "/additionalProperties", $"additionalProperties of kind {additional.ValueKind}.");
                     }
 
-                    return new MapRef(ParseType(additional, location + "/additionalProperties"), OptionalCount(schema, "minProperties", location));
+                    return new MapRef(ParseType(additional, location + "/additionalProperties", pinnedMaxima), OptionalCount(schema, "minProperties", location));
                 }
 
             case "array":
                 {
-                    Only(keys, location, "type", "items", "minItems");
+                    Only(keys, location, "type", "items", "minItems", "maxItems");
+                    ExpectPinnedMaximum(keys, "maxItems", location, pinnedMaxima);
 
                     var items = schema.TryGetProperty("items", out var itemSchema)
-                        ? ParseType(itemSchema, location + "/items")
+                        ? ParseType(itemSchema, location + "/items", pinnedMaxima)
                         : new JsonValueRef(JsonKinds.Any);
 
                     return new ArrayRef(items, OptionalCount(schema, "minItems", location));
@@ -438,7 +548,7 @@ internal static class OpenApiParser
     /// <summary>
     /// An <c>anyOf</c> is either a set of value kinds or a nullable reference. Nothing else is interpreted.
     /// </summary>
-    private static TypeRef ParseAnyOf(JsonElement branches, string location)
+    private static TypeRef ParseAnyOf(JsonElement branches, string location, IReadOnlySet<string> pinnedMaxima)
     {
         var list = branches.EnumerateArray().ToList();
 
@@ -447,7 +557,7 @@ internal static class OpenApiParser
             && list.SingleOrDefault(b => !IsNullBranch(b)) is { ValueKind: JsonValueKind.Object } other
             && other.TryGetProperty("$ref", out _))
         {
-            var reference = ParseType(other, location + "/anyOf");
+            var reference = ParseType(other, location + "/anyOf", pinnedMaxima);
 
             return reference is SchemaRef schemaRef
                 ? new NullableRef(schemaRef)
@@ -562,6 +672,46 @@ internal static class OpenApiParser
         return Naming.IsTypeName(name)
             ? name
             : throw new InvalidDataException($"'{Naming.Printable(name)}' is not usable as a type name.");
+    }
+
+    /// <summary>
+    /// <c>x-accepts</c> restates in words the kinds the <c>anyOf</c> beside it admits, null aside
+    /// (<c>"string | object | array"</c>). It cannot change the wire, so it is read past, but only
+    /// while it says what the schema says: a restatement that disagrees is a document to look at.
+    /// </summary>
+    private static void ExpectAcceptsMatchesAnyOf(JsonElement schema, JsonElement accepts, string location)
+    {
+        if (accepts.ValueKind != JsonValueKind.String || !schema.TryGetProperty("anyOf", out var anyOf) || anyOf.ValueKind != JsonValueKind.Array)
+        {
+            throw Unsupported(location, "'x-accepts' that is not a string beside an anyOf.");
+        }
+
+        var said = accepts.GetString()!
+            .Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Order(StringComparer.Ordinal);
+
+        var admitted = anyOf.EnumerateArray()
+            .Select(b => b.ValueKind == JsonValueKind.Object && b.TryGetProperty("type", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString()! : "?")
+            .Where(kind => kind != "null")
+            .Order(StringComparer.Ordinal);
+
+        if (!said.SequenceEqual(admitted, StringComparer.Ordinal))
+        {
+            throw Unsupported(location, $"'x-accepts' of '{Naming.Printable(accepts.GetString()!)}', which is not what the anyOf beside it admits.");
+        }
+    }
+
+    /// <summary>
+    /// A maximum is read only where <c>semantics.json</c> pins its value. The runtime enforces those
+    /// limits from its constants before a request is sent; the generated types are validated only
+    /// when a response is decoded, so the maximum itself is not emitted.
+    /// </summary>
+    private static void ExpectPinnedMaximum(HashSet<string> keys, string keyword, string location, IReadOnlySet<string> pinnedMaxima)
+    {
+        if (keys.Contains(keyword) && !pinnedMaxima.Contains($"{location[1..]}/{keyword}"))
+        {
+            throw Unsupported(location, $"'{keyword}' where {Semantics.FileName} pins no value. Nothing would enforce it.");
+        }
     }
 
     private static void Expect(JsonElement element, string location, IReadOnlyCollection<string> allowed)

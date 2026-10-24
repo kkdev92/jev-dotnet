@@ -85,11 +85,13 @@ public sealed class GeneratorTests
     {
         var files = Generate().Keys.ToList();
 
-        Assert.Equal(18, files.Count);
+        Assert.Equal(19, files.Count);
         Assert.Contains("JevContract.g.cs", files);
         Assert.Contains("JevWireJsonContext.g.cs", files);
         Assert.Contains("Wire/SystemOneRequest.g.cs", files);
         Assert.Contains("Wire/HttpValidationError.g.cs", files);
+        Assert.Contains("Wire/HttpBadRequestError.g.cs", files);
+        Assert.DoesNotContain("Wire/BoxQuestion.g.cs", files);
     }
 
     [Fact]
