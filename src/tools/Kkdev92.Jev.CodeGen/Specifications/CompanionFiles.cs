@@ -13,8 +13,8 @@ internal sealed record OperationKey(string Method, string Path)
     public override string ToString() => $"{Method} {Path}";
 }
 
-/// <summary><c>public-surface.json</c>: which operations the SDK exposes, and which it refuses to.</summary>
-internal sealed record PublicSurface(IReadOnlyList<ApprovedOperation> Operations, IReadOnlyList<OperationKey> Excluded)
+/// <summary><c>public-surface.json</c>: which operations the SDK exposes, which it refuses to, and which parts of an exposed operation it leaves out.</summary>
+internal sealed record PublicSurface(IReadOnlyList<ApprovedOperation> Operations, IReadOnlyList<OperationKey> Excluded, IReadOnlyList<OmittedPart> Omitted)
 {
     public const string FileName = "public-surface.json";
 
@@ -34,7 +34,35 @@ internal sealed record PublicSurface(IReadOnlyList<ApprovedOperation> Operations
             .Select(e => new OperationKey(SpecJson.String(e, "method"), SpecJson.String(e, "path")))
             .ToList();
 
-        return new PublicSurface(operations, excluded);
+        var omitted = root.TryGetProperty("omitted", out var parts)
+            ? parts.EnumerateArray().Select(OmittedPart.Read).ToList()
+            : [];
+
+        return new PublicSurface(operations, excluded, omitted);
+    }
+}
+
+/// <summary>
+/// A part of the document the SDK does not implement: a feature it does not expose, or a way of
+/// sending a request it does not use. The parser reads the document without it.
+/// </summary>
+/// <remarks>
+/// The entry records the part as it was when the decision was made. If the document stops having
+/// it, or has something different there, generation stops: leaving out a header that is optional
+/// is a decision about that header, not about whatever might later be put in its place.
+/// </remarks>
+internal sealed record OmittedPart(string Pointer, JsonElement Value, string Reason)
+{
+    public static OmittedPart Read(JsonElement element)
+    {
+        var pointer = SpecJson.String(element, "pointer");
+
+        if (!element.TryGetProperty("equals", out var value))
+        {
+            throw new InvalidDataException($"The omitted part at '{pointer}' does not record what it omits ('equals').");
+        }
+
+        return new OmittedPart(pointer, value.Clone(), SpecJson.String(element, "reason"));
     }
 }
 

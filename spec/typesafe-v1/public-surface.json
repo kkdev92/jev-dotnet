@@ -1,13 +1,17 @@
 {
   "$comment": [
-    "Allowlist of operations this SDK exposes publicly, identified by method and path.",
+    "Allowlist of operations this SDK exposes publicly, identified by method and path, and the parts of those operations it leaves out.",
     "Rules enforced by the generator:",
     "  - an entry here that is absent from openapi.json is a generation FAILURE",
     "  - an operation in openapi.json that is neither approved nor excluded is a generation FAILURE",
+    "  - an omitted part must be in openapi.json exactly as 'equals' records it, or generation FAILS: the decision was about",
+    "    that part as it was, not about whatever might later take its place. The parser reads the document without it, so it",
+    "    produces no code. Omitting a discriminator mapping entry omits its oneOf branch too",
     "  - changes to this file require human review: they widen or narrow the public surface",
     "operationId is deliberately not used: the document's ids (systemone_v1_systemone_post) are generated",
     "from the route, and the SDK's names should not depend on how the service generates them.",
-    "Verified against info.version 0.2.0 on 2026-09-23: 2 operations exist, 2 are approved."
+    "Verified against info.version 0.2.0 on 2026-09-23: 2 operations exist, 2 are approved.",
+    "Omitted parts recorded on 2026-10-24 against the snapshot retrieved that day (still info.version 0.2.0)."
   ],
   "operations": [
     {
@@ -23,5 +27,203 @@
       "constant": "Models"
     }
   ],
-  "excluded": []
+  "excluded": [],
+  "omitted": [
+    {
+      "pointer": "/paths/~1v1~1systemone/post/parameters",
+      "equals": [
+        {
+          "in": "header",
+          "name": "TypeSafe-Danger-Zone-Images",
+          "schema": {
+            "enum": [
+              "true"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "in": "header",
+          "name": "TypeSafe-Danger-Zone-Long-Context",
+          "schema": {
+            "enum": [
+              "true"
+            ],
+            "type": "string"
+          }
+        }
+      ],
+      "reason": "Two optional headers, TypeSafe-Danger-Zone-Images and TypeSafe-Danger-Zone-Long-Context, each switching on a feature this SDK does not expose: asset and box questions, and long context. The SDK sends neither."
+    },
+    {
+      "pointer": "/paths/~1v1~1systemone/post/requestBody/content/multipart~1form-data",
+      "equals": {
+        "encoding": {
+          "request": {
+            "contentType": "application/json"
+          }
+        },
+        "schema": {
+          "additionalProperties": {
+            "contentMediaType": "image/*",
+            "type": "string"
+          },
+          "properties": {
+            "request": {
+              "contentMediaType": "application/json",
+              "contentSchema": {
+                "$ref": "#/components/schemas/SystemOneRequest"
+              }
+            }
+          },
+          "required": [
+            "request"
+          ],
+          "type": "object"
+        }
+      },
+      "reason": "A form that carries image files alongside the request. The SDK sends every request as application/json."
+    },
+    {
+      "pointer": "/components/schemas/SystemOneRequest/properties/assets",
+      "equals": {
+        "additionalProperties": {
+          "$ref": "#/components/schemas/Asset"
+        },
+        "minProperties": 1,
+        "type": "object"
+      },
+      "reason": "Images for asset and box questions, which this SDK does not expose. Never sent."
+    },
+    {
+      "pointer": "/components/schemas/Question/discriminator/mapping/box",
+      "equals": "#/components/schemas/BoxQuestion",
+      "reason": "Box questions, which this SDK does not expose. A plan never contains one."
+    },
+    {
+      "pointer": "/components/schemas/Answer/discriminator/mapping/box",
+      "equals": "#/components/schemas/BoxAnswer",
+      "reason": "The answer to a box question. A plan never asks one, and the response reader refuses an answer of a type it does not know."
+    },
+    {
+      "pointer": "/components/schemas/Asset",
+      "equals": {
+        "properties": {
+          "data_base64": {
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "png",
+              "jpg",
+              "jpeg"
+            ],
+            "type": "string"
+          },
+          "part": {
+            "type": "string"
+          },
+          "type": {
+            "const": "image",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "reason": "Referenced only from the omitted assets property."
+    },
+    {
+      "pointer": "/components/schemas/BoxQuestion",
+      "equals": {
+        "properties": {
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "x-accepts": "string | object | array"
+          },
+          "type": {
+            "const": "box",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      },
+      "reason": "Referenced only from the omitted box member of Question."
+    },
+    {
+      "pointer": "/components/schemas/BoxAnswer",
+      "equals": {
+        "properties": {
+          "box": {
+            "$ref": "#/components/schemas/BoxCoordinates"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "box",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "box",
+          "confidence"
+        ],
+        "type": "object"
+      },
+      "reason": "Referenced only from the omitted box member of Answer."
+    },
+    {
+      "pointer": "/components/schemas/BoxCoordinates",
+      "equals": {
+        "properties": {
+          "bottom": {
+            "type": "number"
+          },
+          "left": {
+            "type": "number"
+          },
+          "right": {
+            "type": "number"
+          },
+          "top": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "top",
+          "bottom",
+          "left",
+          "right"
+        ],
+        "type": "object"
+      },
+      "reason": "Referenced only from BoxAnswer, which is omitted."
+    }
+  ]
 }

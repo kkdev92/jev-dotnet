@@ -4,6 +4,7 @@
       "Answer": {
         "discriminator": {
           "mapping": {
+            "box": "#/components/schemas/BoxAnswer",
             "choice": "#/components/schemas/ChoiceAnswer",
             "noul": "#/components/schemas/NoulAnswer",
             "score": "#/components/schemas/ScoreAnswer"
@@ -15,12 +16,119 @@
             "$ref": "#/components/schemas/NoulAnswer"
           },
           {
+            "$ref": "#/components/schemas/ChoiceAnswer"
+          },
+          {
             "$ref": "#/components/schemas/ScoreAnswer"
           },
           {
-            "$ref": "#/components/schemas/ChoiceAnswer"
+            "$ref": "#/components/schemas/BoxAnswer"
           }
         ]
+      },
+      "Asset": {
+        "properties": {
+          "data_base64": {
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "png",
+              "jpg",
+              "jpeg"
+            ],
+            "type": "string"
+          },
+          "part": {
+            "type": "string"
+          },
+          "type": {
+            "const": "image",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "BoxAnswer": {
+        "properties": {
+          "box": {
+            "$ref": "#/components/schemas/BoxCoordinates"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "box",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "box",
+          "confidence"
+        ],
+        "type": "object"
+      },
+      "BoxCoordinates": {
+        "properties": {
+          "bottom": {
+            "type": "number"
+          },
+          "left": {
+            "type": "number"
+          },
+          "right": {
+            "type": "number"
+          },
+          "top": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "top",
+          "bottom",
+          "left",
+          "right"
+        ],
+        "type": "object"
+      },
+      "BoxQuestion": {
+        "properties": {
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "x-accepts": "string | object | array"
+          },
+          "type": {
+            "const": "box",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
       },
       "ChoiceAnswer": {
         "properties": {
@@ -42,10 +150,10 @@
           }
         },
         "required": [
+          "type",
           "choice",
           "confidence",
-          "probabilities",
-          "type"
+          "probabilities"
         ],
         "type": "object"
       },
@@ -68,8 +176,11 @@
                 {
                   "type": "null"
                 }
-              ]
+              ],
+              "x-accepts": "string | object | array"
             },
+            "maxProperties": 255,
+            "minProperties": 1,
             "type": "object"
           },
           "instructions": {
@@ -88,7 +199,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "x-accepts": "string | object | array"
           },
           "type": {
             "const": "choice",
@@ -96,8 +208,27 @@
           }
         },
         "required": [
-          "criteria",
-          "type"
+          "type",
+          "criteria"
+        ],
+        "type": "object"
+      },
+      "HTTPBadRequestError": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ]
+          }
+        },
+        "required": [
+          "detail"
         ],
         "type": "object"
       },
@@ -156,8 +287,8 @@
           }
         },
         "required": [
-          "noul",
-          "type"
+          "type",
+          "noul"
         ],
         "type": "object"
       },
@@ -179,7 +310,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "x-accepts": "string | object | array"
           },
           "true": {
             "anyOf": [
@@ -197,7 +329,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "x-accepts": "string | object | array"
           }
         },
         "type": "object"
@@ -230,7 +363,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "x-accepts": "string | object | array"
           },
           "type": {
             "const": "noul",
@@ -245,6 +379,7 @@
       "Question": {
         "discriminator": {
           "mapping": {
+            "box": "#/components/schemas/BoxQuestion",
             "choice": "#/components/schemas/ChoiceQuestion",
             "noul": "#/components/schemas/NoulQuestion",
             "score": "#/components/schemas/ScoreQuestion"
@@ -260,6 +395,9 @@
           },
           {
             "$ref": "#/components/schemas/ScoreQuestion"
+          },
+          {
+            "$ref": "#/components/schemas/BoxQuestion"
           }
         ]
       },
@@ -282,7 +420,8 @@
                   "items": {},
                   "type": "array"
                 }
-              ]
+              ],
+              "x-accepts": "string | object | array"
             },
             "type": "object"
           },
@@ -301,11 +440,11 @@
           }
         },
         "required": [
+          "type",
           "score",
           "confidence",
           "legend",
-          "probabilities",
-          "type"
+          "probabilities"
         ],
         "type": "object"
       },
@@ -325,8 +464,10 @@
                   "items": {},
                   "type": "array"
                 }
-              ]
+              ],
+              "x-accepts": "string | object | array"
             },
+            "maxItems": 10,
             "minItems": 1,
             "type": "array"
           },
@@ -346,7 +487,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "x-accepts": "string | object | array"
           },
           "type": {
             "const": "score",
@@ -354,13 +496,20 @@
           }
         },
         "required": [
-          "criteria",
-          "type"
+          "type",
+          "criteria"
         ],
         "type": "object"
       },
       "SystemOneRequest": {
         "properties": {
+          "assets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Asset"
+            },
+            "minProperties": 1,
+            "type": "object"
+          },
           "model": {
             "type": "string"
           },
@@ -384,13 +533,14 @@
                 "items": {},
                 "type": "array"
               }
-            ]
+            ],
+            "x-accepts": "string | object | array"
           }
         },
         "required": [
           "model",
-          "questions",
-          "state"
+          "state",
+          "questions"
         ],
         "type": "object"
       },
@@ -437,7 +587,9 @@
           "ctx": {
             "type": "object"
           },
-          "input": {},
+          "input": {
+            "type": "string"
+          },
           "loc": {
             "items": {
               "anyOf": [
@@ -492,6 +644,15 @@
               }
             }
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPBadRequestError"
+                }
+              }
+            }
+          },
           "422": {
             "content": {
               "application/json": {
@@ -512,11 +673,58 @@
     "/v1/systemone": {
       "post": {
         "operationId": "systemone_v1_systemone_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "TypeSafe-Danger-Zone-Images",
+            "schema": {
+              "enum": [
+                "true"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "TypeSafe-Danger-Zone-Long-Context",
+            "schema": {
+              "enum": [
+                "true"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SystemOneRequest"
+              }
+            },
+            "multipart/form-data": {
+              "encoding": {
+                "request": {
+                  "contentType": "application/json"
+                }
+              },
+              "schema": {
+                "additionalProperties": {
+                  "contentMediaType": "image/*",
+                  "type": "string"
+                },
+                "properties": {
+                  "request": {
+                    "contentMediaType": "application/json",
+                    "contentSchema": {
+                      "$ref": "#/components/schemas/SystemOneRequest"
+                    }
+                  }
+                },
+                "required": [
+                  "request"
+                ],
+                "type": "object"
               }
             }
           },
@@ -528,6 +736,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SystemOneResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPBadRequestError"
                 }
               }
             }
@@ -549,5 +766,10 @@
         ]
       }
     }
-  }
+  },
+  "servers": [
+    {
+      "url": "https://api.typesafe.ai"
+    }
+  ]
 }
