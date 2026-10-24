@@ -16,6 +16,17 @@ Dates are UTC, taken from when the packages went to nuget.org.
 
 ## [Unreleased]
 
+## [0.1.2-alpha] - 2026-10-24
+
+Generated from the same TypeSafe contract as 0.1.0-alpha and 0.1.1-alpha: OpenAPI document `3.1.0`,
+`info.version` `0.2.0` (document SHA-256 `a191f8a7…c0360d5`, contract SHA-256
+`167e85e6…91d852f6`). The public surface is unchanged; only a dependency floor moves.
+
+### Changed
+
+- `Kkdev92.Jev.DependencyInjection` depends on `Microsoft.Extensions.Http` and
+  `Microsoft.Extensions.Options` 10.0.13 or later, up from 10.0.12.
+
 ## [0.1.1-alpha] - 2026-09-25
 
 ### Changed
@@ -89,6 +100,7 @@ retrieved 2026-09-22 (document SHA-256 `a191f8a7…c0360d5`, contract SHA-256
   endpoint has been checked only without a key: the `401` and `403` bodies, the response headers
   and HTTP/2. What only a keyed call can settle is listed under Known Limitations in the README.
 
-[Unreleased]: https://github.com/kkdev92/jev-dotnet/compare/v0.1.1-alpha...HEAD
+[Unreleased]: https://github.com/kkdev92/jev-dotnet/compare/v0.1.2-alpha...HEAD
+[0.1.2-alpha]: https://github.com/kkdev92/jev-dotnet/compare/v0.1.1-alpha...v0.1.2-alpha
 [0.1.1-alpha]: https://github.com/kkdev92/jev-dotnet/compare/v0.1.0-alpha...v0.1.1-alpha
 [0.1.0-alpha]: https://github.com/kkdev92/jev-dotnet/releases/tag/v0.1.0-alpha

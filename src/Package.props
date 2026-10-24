@@ -27,7 +27,7 @@
   <!-- Package identity:
        the NuGet version axis is independent of the TypeSafe API version. -->
   <PropertyGroup>
-    <VersionPrefix>0.1.1</VersionPrefix>
+    <VersionPrefix>0.1.2</VersionPrefix>
     <VersionSuffix Condition="'$(VersionSuffix)' == ''">alpha</VersionSuffix>
     <Authors>kkdev92</Authors>
     <Company>kkdev92</Company>
@@ -63,7 +63,7 @@
   <PropertyGroup>
     <EnablePackageValidation>true</EnablePackageValidation>
     <LastVersionWithoutBaseline>0.1.0</LastVersionWithoutBaseline>
-    <PackageValidationBaselineVersion>0.1.0-alpha</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion>0.1.1-alpha</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <!--
