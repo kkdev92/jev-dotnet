@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Kkdev92.Jev.CodeGen.IntermediateModel;
@@ -14,8 +15,8 @@ namespace Kkdev92.Jev.CodeGen.OpenApi;
 /// This is not a general OpenAPI generator and does not try to be one. It understands the
 /// keywords the TypeSafe document uses today — objects with properties, maps, arrays,
 /// <c>anyOf</c> over value kinds, a nullable reference, a discriminated <c>oneOf</c>,
-/// <c>minItems</c> and <c>minProperties</c>, the one server the runtime sends to — and fails
-/// closed on everything else.
+/// <c>minItems</c> and <c>minProperties</c>, optional headers that take one fixed value, the one
+/// server the runtime sends to — and fails closed on everything else.
 /// </para>
 /// <para>
 /// Failing closed is the point. If a snapshot adds <c>maxItems: 10</c> to the score criteria, the
@@ -81,8 +82,10 @@ internal static class OpenApiParser
 
     /// <summary>
     /// The document without the parts <c>public-surface.json</c> leaves out. Each must be there
-    /// exactly as recorded. Leaving out a discriminator mapping entry leaves out its <c>oneOf</c>
-    /// branch with it, so the union is read as one member shorter.
+    /// exactly as recorded. Every pointer names a part of the document as committed, so an array
+    /// element is named by its index before anything is removed. Leaving out a discriminator
+    /// mapping entry leaves out its <c>oneOf</c> branch with it, so the union is read as one member
+    /// shorter.
     /// </summary>
     private static byte[] WithoutOmittedParts(byte[] canonical, IReadOnlyList<OmittedPart> omitted)
     {
@@ -92,18 +95,25 @@ internal static class OpenApiParser
         }
 
         var root = JsonNode.Parse(canonical)!.AsObject();
+        var resolved = new List<(OmittedPart Part, string[] Segments, JsonNode Parent, JsonNode? Value)>();
+        var pointers = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var part in omitted)
         {
+            if (!pointers.Add(part.Pointer))
+            {
+                throw new InvalidDataException($"{PublicSurface.FileName} omits {part.Pointer} twice.");
+            }
+
             var segments = PointerSegments(part.Pointer);
             JsonNode? parent = root;
 
             foreach (var segment in segments[..^1])
             {
-                parent = parent is JsonObject o && o.TryGetPropertyValue(segment, out var next) ? next : null;
+                parent = TryChild(parent, segment, out var next) ? next : null;
             }
 
-            if (parent is not JsonObject owner || !owner.TryGetPropertyValue(segments[^1], out var value))
+            if (parent is null || !TryChild(parent, segments[^1], out var value))
             {
                 throw new InvalidDataException($"{PublicSurface.FileName} omits {part.Pointer}, which the document does not have. Remove the stale entry.");
             }
@@ -113,7 +123,19 @@ internal static class OpenApiParser
                 throw new InvalidDataException($"{PublicSurface.FileName} omits {part.Pointer} as it was when that was decided, and the document now has something else there. Decide again.");
             }
 
-            owner.Remove(segments[^1]);
+            resolved.Add((part, segments, parent, value));
+        }
+
+        // Removing an element moves the ones after it, so elements go last first, and before a
+        // branch is looked up by what it refers to.
+        foreach (var (_, segments, parent, _) in resolved.Where(r => r.Parent is JsonArray).OrderByDescending(r => ArrayIndex(r.Segments[^1])))
+        {
+            parent.AsArray().RemoveAt(ArrayIndex(segments[^1])!.Value);
+        }
+
+        foreach (var (part, segments, parent, value) in resolved.Where(r => r.Parent is JsonObject))
+        {
+            parent.AsObject().Remove(segments[^1]);
 
             if (segments is ["components", "schemas", var union, "discriminator", "mapping", _])
             {
@@ -128,11 +150,38 @@ internal static class OpenApiParser
         return JsonSerializer.SerializeToUtf8Bytes(root);
     }
 
-    /// <summary>The segments of an RFC 6901 pointer that names an object member.</summary>
+    /// <summary>The member or element that one pointer segment names, when there is one.</summary>
+    private static bool TryChild(JsonNode? node, string segment, out JsonNode? child)
+    {
+        switch (node)
+        {
+            case JsonObject members:
+                return members.TryGetPropertyValue(segment, out child);
+
+            case JsonArray elements when ArrayIndex(segment) is { } index && index < elements.Count:
+                child = elements[index];
+                return true;
+
+            default:
+                child = null;
+                return false;
+        }
+    }
+
+    /// <summary>A pointer segment read as an array index: digits, with no leading zero.</summary>
+    private static int? ArrayIndex(string segment)
+        => segment.Length > 0
+            && segment.All(char.IsAsciiDigit)
+            && (segment.Length == 1 || segment[0] != '0')
+            && int.TryParse(segment, NumberStyles.None, CultureInfo.InvariantCulture, out var index)
+                ? index
+                : null;
+
+    /// <summary>The segments of an RFC 6901 pointer that names a member or an element.</summary>
     private static string[] PointerSegments(string pointer)
         => pointer.Length > 1 && pointer[0] == '/'
             ? pointer[1..].Split('/').Select(s => s.Replace("~1", "/", StringComparison.Ordinal).Replace("~0", "~", StringComparison.Ordinal)).ToArray()
-            : throw new InvalidDataException($"'{pointer}' is not a JSON pointer to a member.");
+            : throw new InvalidDataException($"'{pointer}' is not a JSON pointer to a member or an element.");
 
     /// <summary>Pointers to a <c>maxItems</c> or <c>maxProperties</c> whose value <c>semantics.json</c> pins with an <c>equals</c> check.</summary>
     private static HashSet<string> PinnedMaxima(Semantics semantics)
@@ -218,7 +267,11 @@ internal static class OpenApiParser
                 }
 
                 var operation = method.Value;
-                Expect(operation, location, allowed: ["summary", "description", "operationId", "requestBody", "responses", "security", "tags"]);
+                Expect(operation, location, allowed: ["summary", "description", "operationId", "parameters", "requestBody", "responses", "security", "tags"]);
+
+                var headers = operation.TryGetProperty("parameters", out var parameters)
+                    ? ParseHeaders(parameters, location + "/parameters")
+                    : [];
 
                 string? requestSchema = null;
                 var requestRequired = false;
@@ -270,6 +323,7 @@ internal static class OpenApiParser
                     operation.TryGetProperty("operationId", out var id) ? id.GetString() : null,
                     requestSchema,
                     requestRequired,
+                    headers,
                     responses,
                     security));
             }
@@ -277,6 +331,81 @@ internal static class OpenApiParser
 
         return operations;
     }
+
+    /// <summary>
+    /// An operation's parameters, each of which must be an optional header with one allowed value:
+    /// a switch the caller turns on by sending it.
+    /// </summary>
+    /// <remarks>
+    /// Query, path and cookie parameters, a required header, and a header that carries a value of
+    /// the caller's choosing would each need the runtime to send something it does not, so each
+    /// stops generation.
+    /// </remarks>
+    private static List<HeaderDef> ParseHeaders(JsonElement parameters, string location)
+    {
+        if (parameters.ValueKind != JsonValueKind.Array)
+        {
+            throw Unsupported(location, $"parameters of kind {parameters.ValueKind}.");
+        }
+
+        var headers = new List<HeaderDef>();
+        var index = 0;
+
+        foreach (var parameter in parameters.EnumerateArray())
+        {
+            var parameterLocation = $"{location}/{index++}";
+            Expect(parameter, parameterLocation, allowed: ["in", "name", "required", "schema"]);
+
+            var where = String(parameter, "in", parameterLocation);
+
+            if (where != "header")
+            {
+                throw Unsupported(parameterLocation, $"a parameter in '{Naming.Printable(where)}'. Only optional headers are interpreted.");
+            }
+
+            var name = String(parameter, "name", parameterLocation);
+
+            if (!IsToken(name))
+            {
+                throw Unsupported(parameterLocation, $"the header name '{Naming.Printable(name)}', which is not an HTTP token.");
+            }
+
+            if (parameter.TryGetProperty("required", out var required) && required.ValueKind != JsonValueKind.False)
+            {
+                throw Unsupported(parameterLocation, $"a required '{name}' header. A header is sent only when the caller turns on what it switches.");
+            }
+
+            if (!parameter.TryGetProperty("schema", out var schema))
+            {
+                throw Unsupported(parameterLocation, $"a '{name}' header without a schema.");
+            }
+
+            Expect(schema, parameterLocation + "/schema", allowed: ["type", "enum"]);
+
+            if (String(schema, "type", parameterLocation + "/schema") != "string"
+                || !schema.TryGetProperty("enum", out var values)
+                || values.ValueKind != JsonValueKind.Array
+                || values.GetArrayLength() != 1
+                || values[0].ValueKind != JsonValueKind.String
+                || !IsToken(values[0].GetString()!))
+            {
+                throw Unsupported(parameterLocation + "/schema", $"a '{name}' header that takes something other than one fixed value.");
+            }
+
+            if (headers.Any(h => string.Equals(h.Name, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw Unsupported(parameterLocation, $"a second '{name}' header. Header names are case-insensitive.");
+            }
+
+            headers.Add(new HeaderDef(name, values[0].GetString()!));
+        }
+
+        return headers;
+    }
+
+    /// <summary>An RFC 9110 token, the shape of a header name and of the values this parser accepts for one.</summary>
+    private static bool IsToken(string text)
+        => text.Length > 0 && text.All(c => char.IsAsciiLetterOrDigit(c) || "!#$%&'*+-.^_`|~".Contains(c, StringComparison.Ordinal));
 
     /// <summary>The schema of an <c>application/json</c> body, which must be a reference.</summary>
     private static string JsonContentSchema(JsonElement owner, string location)

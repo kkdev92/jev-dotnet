@@ -28,7 +28,7 @@ namespace Kkdev92.Jev.CodeGen.CSharp;
 internal static partial class CSharpEmitter
 {
     /// <summary>Bumped by hand when a change to this emitter changes its output.</summary>
-    public const int GeneratorVersion = 2;
+    public const int GeneratorVersion = 3;
 
     public const string Namespace = "Kkdev92.Jev.Wire";
     public const string ContextName = "JevWireJsonContext";
@@ -385,7 +385,8 @@ internal static partial class CSharpEmitter
         writer.Line();
         writer.Line("/// <summary>");
         writer.Line("/// The facts about the contract that the handwritten runtime depends on, generated so that they cannot");
-        writer.Line("/// drift from the snapshot: where the operations are, and the constants recorded in semantics.json.");
+        writer.Line("/// drift from the snapshot: where the operations are, the headers they may be sent with, and the");
+        writer.Line("/// constants recorded in semantics.json.");
         writer.Line("/// </summary>");
         writer.Open($"internal static class {ContractClassName}");
 
@@ -413,6 +414,17 @@ internal static partial class CSharpEmitter
             writer.Line();
             writer.Line($"/// <summary>The path of <c>{Xml(operation.Definition.Key.ToString())}</c>.</summary>");
             writer.Line($"public const string {name}Path = {CodeWriter.Literal(operation.Definition.Key.Path)};");
+
+            foreach (var approval in operation.Approval.Headers.OrderBy(h => h.ConstantName, StringComparer.Ordinal))
+            {
+                var declared = operation.Definition.Headers.Single(h => string.Equals(h.Name, approval.Name, StringComparison.Ordinal));
+                writer.Line();
+                writer.Line($"/// <summary>The name of an optional header of <c>{Xml(operation.Definition.Key.ToString())}</c>.</summary>");
+                writer.Line($"public const string {approval.ConstantName}Header = {CodeWriter.Literal(declared.Name)};");
+                writer.Line();
+                writer.Line($"/// <summary>The one value <c>{Xml(declared.Name)}</c> takes.</summary>");
+                writer.Line($"public const string {approval.ConstantName}HeaderValue = {CodeWriter.Literal(declared.Value)};");
+            }
         }
 
         foreach (var constant in contract.Constants.OrderBy(c => c.Name, StringComparer.Ordinal))

@@ -3,13 +3,14 @@
 // specification or the generator, then run 'codegen generate'.
 // Contract: typesafe-v1, OpenAPI 3.1.0, API version 0.2.0
 // Spec SHA-256: 8b0cfc1cc772be7da4ef5a15254d9d40d9784af0d7f29a73265dd23379f4cddd
-// Generator: 2
+// Generator: 3
 
 namespace Kkdev92.Jev.Wire;
 
 /// <summary>
 /// The facts about the contract that the handwritten runtime depends on, generated so that they cannot
-/// drift from the snapshot: where the operations are, and the constants recorded in semantics.json.
+/// drift from the snapshot: where the operations are, the headers they may be sent with, and the
+/// constants recorded in semantics.json.
 /// </summary>
 internal static class JevContract
 {
@@ -26,7 +27,7 @@ internal static class JevContract
     public const string SpecSha256 = "8b0cfc1cc772be7da4ef5a15254d9d40d9784af0d7f29a73265dd23379f4cddd";
 
     /// <summary>The version of the generator that produced this code.</summary>
-    public const int GeneratorVersion = 2;
+    public const int GeneratorVersion = 3;
 
     /// <summary>The method of <c>GET /v1/models</c>.</summary>
     public const string ModelsMethod = "GET";
@@ -39,6 +40,12 @@ internal static class JevContract
 
     /// <summary>The path of <c>POST /v1/systemone</c>.</summary>
     public const string SystemOnePath = "/v1/systemone";
+
+    /// <summary>The name of an optional header of <c>POST /v1/systemone</c>.</summary>
+    public const string LongContextHeader = "TypeSafe-Danger-Zone-Long-Context";
+
+    /// <summary>The one value <c>TypeSafe-Danger-Zone-Long-Context</c> takes.</summary>
+    public const string LongContextHeaderValue = "true";
 
     /// <summary>From semantics.json (documented).</summary>
     public const int ChoiceOptionsMaximum = 255;

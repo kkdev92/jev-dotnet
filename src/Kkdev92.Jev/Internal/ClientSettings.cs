@@ -20,6 +20,7 @@ internal sealed class ClientSettings
     {
         Credential = options.Credential!;
         DefaultModel = options.DefaultModel;
+        UseLongContext = options.UseLongContext;
         BaseAddress = options.BaseAddress;
         Timeout = options.Timeout;
         AdditionalRetries = options.AdditionalRetries;
@@ -44,6 +45,8 @@ internal sealed class ClientSettings
     public IJevCredential Credential { get; }
 
     public string DefaultModel { get; }
+
+    public bool UseLongContext { get; }
 
     public Uri BaseAddress { get; }
 
@@ -206,9 +209,10 @@ internal sealed class ClientSettings
 /// <summary>The settings of one call: the client's, overridden by the call's own options, frozen when the call starts.</summary>
 internal readonly struct CallSettings
 {
-    private CallSettings(string model, TimeSpan timeout, int retries, IJevCredential credential, bool captureRaw, bool captureError)
+    private CallSettings(string model, bool longContext, TimeSpan timeout, int retries, IJevCredential credential, bool captureRaw, bool captureError)
     {
         Model = model;
+        UseLongContext = longContext;
         Timeout = timeout;
         AdditionalRetries = retries;
         Credential = credential;
@@ -217,6 +221,9 @@ internal readonly struct CallSettings
     }
 
     public string Model { get; }
+
+    /// <summary>Whether an evaluation is sent with the long-context header. Listing models never is.</summary>
+    public bool UseLongContext { get; }
 
     public TimeSpan Timeout { get; }
 
@@ -232,7 +239,7 @@ internal readonly struct CallSettings
     {
         if (options is null)
         {
-            return new CallSettings(client.DefaultModel, client.Timeout, client.AdditionalRetries, client.Credential, client.CaptureRawResponse, client.CaptureErrorBody);
+            return new CallSettings(client.DefaultModel, client.UseLongContext, client.Timeout, client.AdditionalRetries, client.Credential, client.CaptureRawResponse, client.CaptureErrorBody);
         }
 
         // Read each property once, so a concurrent change to a shared instance cannot make the
@@ -258,6 +265,7 @@ internal readonly struct CallSettings
 
         return new CallSettings(
             model ?? client.DefaultModel,
+            options.UseLongContext ?? client.UseLongContext,
             timeout ?? client.Timeout,
             retries ?? client.AdditionalRetries,
             options.Credential ?? client.Credential,

@@ -38,7 +38,7 @@ public sealed class JevResult
 
     /// <summary>
     /// The model that answered, as the service reported it. For an alias this is the version it
-    /// resolved to, such as <c>jev-1.13.0</c> — the value to log next to a decision.
+    /// resolved to, such as <c>jev-1.14.0</c> — the value to log next to a decision.
     /// </summary>
     public string ActualModel => _decoded.Model;
 

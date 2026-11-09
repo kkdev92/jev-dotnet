@@ -209,7 +209,7 @@ public readonly struct NoulAnswer
 /// <remarks>
 /// Values are kept as the service sent them. <see cref="ReleaseDate"/> is documented as
 /// <c>YYYY-MM-DD</c> but kept as text, so an unexpected format is visible rather than lost in
-/// parsing. The list currently holds aliases only; versioned ids such as <c>jev-1.13.0</c> are
+/// parsing. The list currently holds aliases only; versioned ids such as <c>jev-1.14.0</c> are
 /// accepted whether or not they appear in it, so do not use it to decide whether a model exists.
 /// </remarks>
 public sealed class JevModel

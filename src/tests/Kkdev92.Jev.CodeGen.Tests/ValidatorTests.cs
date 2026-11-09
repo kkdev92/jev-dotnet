@@ -50,6 +50,37 @@ public sealed class ValidatorTests
         Assert.Throws<InvalidDataException>(() => Validate(snapshot));
     }
 
+    [Fact]
+    public void TheApprovedHeaderIsExposedWithItsConstant()
+    {
+        var systemOne = Validate(SpecFixture.Committed()).Operations.Single(o => o.Approval.ConstantName == "SystemOne");
+
+        var header = Assert.Single(systemOne.Approval.Headers);
+        Assert.Equal(("TypeSafe-Danger-Zone-Long-Context", "LongContext"), (header.Name, header.ConstantName));
+        Assert.Equal("true", Assert.Single(systemOne.Definition.Headers).Value);
+    }
+
+    /// <summary>A header is sent because public-surface.json says so, never because the document declares it.</summary>
+    [Fact]
+    public void ANewHeaderStopsGenerationUntilItIsClassified()
+    {
+        var snapshot = SpecFixture.With(d => d["paths"]!["/v1/systemone"]!["post"]!["parameters"]!.AsArray().Add(JsonNode.Parse(
+            """{"in":"header","name":"TypeSafe-Danger-Zone-Other","schema":{"enum":["true"],"type":"string"}}""")));
+
+        var exception = Assert.Throws<InvalidDataException>(() => Validate(snapshot));
+        Assert.Contains("TypeSafe-Danger-Zone-Other", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("neither approves nor omits", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AnApprovedHeaderThatDisappearedIsAnError()
+    {
+        var snapshot = SpecFixture.With(d => d["paths"]!["/v1/systemone"]!["post"]!["parameters"]!.AsArray().RemoveAt(1));
+
+        var exception = Assert.Throws<InvalidDataException>(() => Validate(snapshot));
+        Assert.Contains("does not declare", exception.Message, StringComparison.Ordinal);
+    }
+
     /// <summary>
     /// semantics.json resolved the instructions conflict on the basis that the document makes them
     /// optional. When that stops being true, the resolution is stale and generation says so.

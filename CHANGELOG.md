@@ -16,6 +16,29 @@ Dates are UTC, taken from when the packages went to nuget.org.
 
 ## [Unreleased]
 
+Generated from the same snapshot of TypeSafe's contract as 0.1.2-alpha.
+
+### Added
+
+- `JevClientOptions.UseLongContext` and `JevRequestOptions.UseLongContext` ask for long context:
+  an evaluation is sent with `TypeSafe-Danger-Zone-Long-Context: true`, which raises the model's
+  per-request and per-question context limits. Off by default. A call's own value wins over the
+  client's, and listing models never sends the header.
+
+### Changed
+
+- `JevHttpException.Message` names `max_tokens_exceeded`, the error type TypeSafe sends with a
+  `400` for a request longer than the model's context length. `ErrorType` already carried it.
+
+### Notes
+
+- Run against the live service with an API key: an evaluation that asks for long context is
+  accepted, and a state too long for the default context, sent without it, is refused with `400`
+  and `max_tokens_exceeded` in `detail.error_type`. No keyed call has yet sent a state that long
+  with long context on.
+- Images and box questions are still not implemented, and the header that switches them on is
+  never sent.
+
 ## [0.1.2-alpha] - 2026-10-24
 
 Generated from a newer snapshot of TypeSafe's contract: OpenAPI document `3.1.0`, `info.version`

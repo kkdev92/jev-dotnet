@@ -3,13 +3,14 @@ using System.Collections.Concurrent;
 namespace Kkdev92.Jev.IntegrationTests;
 
 /// <summary>
-/// What a live test saw beneath the client: how many requests left the process, the HTTP version
-/// each response came back over, and the last response body.
+/// What a live test saw beneath the client: how many requests left the process and the names of
+/// their headers, the HTTP version each response came back over, and the last response body.
 /// </summary>
 /// <remarks>
 /// The body is kept for one purpose: when the SDK refuses a response, the report can still say
 /// what shape it had. The SDK itself never hands a refused body back — its exceptions carry no
-/// content — so this is the only place a keyed run can learn why.
+/// content — so this is the only place a keyed run can learn why. Header values are not kept: one
+/// of them is the key.
 /// </remarks>
 internal sealed class Recording
 {
@@ -19,13 +20,20 @@ internal sealed class Recording
     /// <summary>How many requests were sent, retries included.</summary>
     public int Requests => Volatile.Read(ref _requests);
 
+    /// <summary>The names of each request's headers, in the order the requests were sent.</summary>
+    public ConcurrentQueue<IReadOnlyList<string>> HeaderNames { get; } = new();
+
     /// <summary>The protocol version of each response, in the order they arrived.</summary>
     public ConcurrentQueue<Version> Versions { get; } = new();
 
     /// <summary>The body of the last response, whatever its status.</summary>
     public byte[]? LastBody => Volatile.Read(ref _lastBody);
 
-    internal void Sent() => Interlocked.Increment(ref _requests);
+    internal void Sent(IReadOnlyList<string> headerNames)
+    {
+        Interlocked.Increment(ref _requests);
+        HeaderNames.Enqueue(headerNames);
+    }
 
     internal void Received(Version version, byte[] body)
     {
@@ -47,7 +55,7 @@ internal sealed class RecordingHandler : DelegatingHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        _recording.Sent();
+        _recording.Sent([.. request.Headers.Select(header => header.Key)]);
 
         var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
 

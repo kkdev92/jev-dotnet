@@ -45,6 +45,11 @@ public static class FakeResponses
         """{"detail":{"error_type":"api_usage_error","message":"Unknown model: jev-does-not-exist"}}""",
         HttpStatusCode.BadRequest);
 
+    /// <summary>The observed body of a request longer than the model's context length: status 400, and no message.</summary>
+    public static HttpResponseMessage ContextLengthExceeded() => Json(
+        """{"detail":{"error_type":"max_tokens_exceeded"}}""",
+        HttpStatusCode.BadRequest);
+
     /// <summary>The observed body of a request with an invalid key: status 401.</summary>
     public static HttpResponseMessage InvalidKey() => Json(
         """{"detail":{"error_type":"authentication_error","message":"Cannot authenticate with the server. Please check your API key and try again."}}""",

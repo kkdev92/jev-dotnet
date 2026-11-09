@@ -144,6 +144,27 @@ internal static class DiffCommand
                 breaking.Add($"{key}: security changed from [{string.Join(", ", a.SecuritySchemes)}] to [{string.Join(", ", b.SecuritySchemes)}]");
             }
 
+            var headersBefore = a.Headers.ToDictionary(h => h.Name, h => h.Value, StringComparer.Ordinal);
+            var headersAfter = b.Headers.ToDictionary(h => h.Name, h => h.Value, StringComparer.Ordinal);
+
+            foreach (var name in headersAfter.Keys.Except(headersBefore.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal))
+            {
+                additive.Add($"{key}: new header {name} — generation stops until public-surface.json approves or omits it");
+            }
+
+            foreach (var name in headersBefore.Keys.Except(headersAfter.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal))
+            {
+                breaking.Add($"{key}: no longer declares the header {name}");
+            }
+
+            foreach (var name in headersBefore.Keys.Intersect(headersAfter.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal))
+            {
+                if (!string.Equals(headersBefore[name], headersAfter[name], StringComparison.Ordinal))
+                {
+                    breaking.Add($"{key}: the header {name} takes {headersAfter[name]} where it took {headersBefore[name]}");
+                }
+            }
+
             var responsesBefore = a.Responses.ToDictionary(r => r.Status, r => r.Schema, StringComparer.Ordinal);
             var responsesAfter = b.Responses.ToDictionary(r => r.Status, r => r.Schema, StringComparer.Ordinal);
 

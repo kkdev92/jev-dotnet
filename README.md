@@ -230,7 +230,7 @@ var score = result.Get(severity);
 score.Value;                           // the expectation over the levels, which can fall between them
 score.Legend[2];                       // the level as the service echoed it, a JsonElement
 
-result.ActualModel;                    // the version that answered, such as jev-1.13.0
+result.ActualModel;                    // the version that answered, such as jev-1.14.0
 result.Usage.InputTokens;              // what TypeSafe bills
 result.Metadata.RequestId;             // quote this when asking TypeSafe about a call
 ```
@@ -243,7 +243,7 @@ the call failed: there is no partial result to check for gaps.
 ```csharp
 await client.EvaluateAsync(text, plan, new JevRequestOptions
 {
-    Model = "jev-1.13.0",               // pin a version when results must stay comparable
+    Model = "jev-1.14.0",               // pin a version when results must stay comparable
     Timeout = TimeSpan.FromSeconds(5),
     AdditionalRetries = 2,              // 408, 429, 502, 503, 504 and 529 only
 });
@@ -251,6 +251,13 @@ await client.EvaluateAsync(text, plan, new JevRequestOptions
 
 `jev-latest` is an alias that moves when TypeSafe ships a model. When confidence thresholds were
 tuned on one version, pin it.
+
+A request has to fit the model's context, which TypeSafe counts in tokens, per request and per
+question; one that does not is refused with `400`, and `JevHttpException.ErrorType` is
+`max_tokens_exceeded`. `UseLongContext = true` asks TypeSafe to raise both limits for that call.
+TypeSafe documents long context as slower and less accurate than staying within the default
+limits, so ask for it on the calls that need it; `JevClientOptions.UseLongContext` asks for it on
+every evaluation. The limits are on TypeSafe's [models page](https://docs.typesafe.ai/models).
 
 ### Handle errors
 
@@ -346,10 +353,13 @@ every client it creates, and redacts header values unless told otherwise.
   `400`; the SDK refuses before sending. 1,024 questions and 1 MiB of encoded questions per plan are
   this SDK's. A request under every local limit can still exceed the model's context, which is
   counted in tokens the SDK cannot count
-- **No box questions, images or long context.** TypeSafe's OpenAPI document describes a box
-  question, images sent with a request, and two opt-in headers for those and for long context. This
-  SDK sends none of them, and refuses a box answer like any answer of a type it does not know. What
-  is left out, and why, is listed in `spec/typesafe-v1/public-surface.json`
+- **No box questions or images.** TypeSafe's OpenAPI document describes a box question, images
+  sent with a request, and an opt-in header for them. This SDK sends none of them, and refuses a box
+  answer like any answer of a type it does not know. What is left out, and why, is listed in
+  `spec/typesafe-v1/public-surface.json`
+- **That long context raises the limits is TypeSafe's word.** A keyed evaluation that asks for it
+  is accepted, and a state too long for the default context, sent without it, is refused with `400`
+  and `max_tokens_exceeded`; no keyed call has yet sent a state that long with long context on
 - **No streaming, no batching.** The API offers neither
 - **One target.** `net10.0` only; no multi-targeting is planned
 - **The consistency tolerance is provisional.** `1e-6` absolute and relative is this SDK's choice;

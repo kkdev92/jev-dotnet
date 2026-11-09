@@ -87,6 +87,7 @@ internal static class ContractValidator
                 throw new InvalidDataException($"{PublicSurface.FileName}: '{entry.ConstantName}' is not a unique PascalCase constant name.");
             }
 
+            ValidateHeaders(entry, operation, constants);
             approved.Add(new ExposedOperation(operation, entry));
         }
 
@@ -114,6 +115,42 @@ internal static class ContractValidator
             .OrderBy(o => o.Definition.Key.Path, StringComparer.Ordinal)
             .ThenBy(o => o.Definition.Key.Method, StringComparer.Ordinal)
             .ToList();
+    }
+
+    /// <summary>
+    /// A header is sent because <c>public-surface.json</c> approves it, never because the document
+    /// declares it. One the document adds stops generation until it is approved or omitted.
+    /// </summary>
+    private static void ValidateHeaders(ApprovedOperation entry, OperationDef operation, HashSet<string> constants)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var header in entry.Headers)
+        {
+            if (!names.Add(header.Name))
+            {
+                throw new InvalidDataException($"{PublicSurface.FileName} approves the header '{header.Name}' of {entry.Key} twice.");
+            }
+
+            if (!operation.Headers.Any(h => string.Equals(h.Name, header.Name, StringComparison.Ordinal)))
+            {
+                throw new InvalidDataException($"{PublicSurface.FileName} approves the header '{header.Name}' of {entry.Key}, which the document does not declare.");
+            }
+
+            if (!Naming.IsTypeName(header.ConstantName) || !constants.Add(header.ConstantName))
+            {
+                throw new InvalidDataException($"{PublicSurface.FileName}: '{header.ConstantName}' is not a unique PascalCase constant name.");
+            }
+        }
+
+        var unclassified = operation.Headers.Where(h => !names.Contains(h.Name)).Select(h => h.Name).ToList();
+
+        if (unclassified.Count > 0)
+        {
+            throw new InvalidDataException(
+                $"{entry.Key} declares headers that {PublicSurface.FileName} neither approves nor omits: {string.Join(", ", unclassified)}. "
+                + "Classify each one; a new header is never sent by default.");
+        }
     }
 
     private static HashSet<SchemaDef> Reachable(ApiContract contract, IReadOnlyList<ExposedOperation> exposed)

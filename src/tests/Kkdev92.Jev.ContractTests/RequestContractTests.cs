@@ -39,6 +39,48 @@ public sealed class RequestContractTests
 
         // The SDK identifies itself by its User-Agent alone, and sends no X-TypeSafe-* header.
         Assert.DoesNotContain(request.Headers.Keys, k => k.StartsWith("X-TypeSafe", StringComparison.OrdinalIgnoreCase));
+
+        // Nor a header that switches on something the caller did not ask for.
+        Assert.DoesNotContain(request.Headers.Keys, k => k.StartsWith("TypeSafe-", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
+    [InlineData(false, null, false)]
+    [InlineData(true, null, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    public async Task LongContextIsAskedForWhenTheCallOrElseTheClientTurnsItOn(bool client, bool? call, bool sent)
+    {
+        var handler = FakeHttpMessageHandler.Always(Answer());
+        var (plan, _, _) = Plan();
+        var options = call is null ? null : new JevRequestOptions { UseLongContext = call };
+
+        await Create(handler, o => o.UseLongContext = client).EvaluateAsync("text", plan, options, TestContext.Current.CancellationToken);
+
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal(sent, request.Headers.TryGetValue("TypeSafe-Danger-Zone-Long-Context", out var value));
+        Assert.Equal(sent ? "true" : null, value);
+    }
+
+    [Fact]
+    public async Task LongContextIsAskedForByEveryAttempt()
+    {
+        var handler = FakeHttpMessageHandler.Sequence(FakeResponses.Overloaded, () => FakeResponses.Json(Answer()));
+        var (plan, _, _) = Plan();
+
+        await Create(handler, o => o.AdditionalRetries = 1).EvaluateAsync("text", plan, new JevRequestOptions { UseLongContext = true }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(["true", "true"], handler.Requests.Select(r => r.Headers["TypeSafe-Danger-Zone-Long-Context"]));
+    }
+
+    [Fact]
+    public async Task ListingModelsNeverAsksForLongContext()
+    {
+        var handler = FakeHttpMessageHandler.Always(FakeResponses.Models());
+
+        await Create(handler, o => o.UseLongContext = true).GetModelsAsync(new JevRequestOptions { UseLongContext = true }, TestContext.Current.CancellationToken);
+
+        Assert.False(Assert.Single(handler.Requests).Headers.ContainsKey("TypeSafe-Danger-Zone-Long-Context"));
     }
 
     [Fact]

@@ -7,7 +7,8 @@
     "conflicts record where TypeSafe's own descriptions of the API differ. Each carries checks against openapi.json: if a later",
     "snapshot stops saying what a resolution relies on, generation stops and the resolution has to be revisited.",
     "Everything here was verified on 2026-09-23 against info.version 0.2.0. The base address, the choice and score limits and",
-    "status 400 were revisited on 2026-10-24, when the snapshot retrieved that day (still info.version 0.2.0) began to declare them."
+    "status 400 were revisited on 2026-10-24, when the snapshot retrieved that day (still info.version 0.2.0) began to declare them.",
+    "Status 400 was revisited again on 2026-11-09: TypeSafe's errors page names max_tokens_exceeded, and a keyed call showed where it appears."
   ],
   "constants": [
     {
@@ -227,18 +228,26 @@
     },
     {
       "id": "status-400",
-      "summary": "The service answers 400 for a request it understands but will not serve. The HTTP reference does not list 400. The OpenAPI document did not either until the snapshot retrieved 2026-10-24, which declares it with a detail that is a string or an object, the two shapes observed.",
+      "summary": "The service answers 400 for a request it understands but will not serve. TypeSafe's errors page lists it for a body that breaks a request rule and, with max_tokens_exceeded, for a request longer than the model's context length, without saying where in the body the error type appears. The OpenAPI document did not declare 400 until the snapshot retrieved 2026-10-24, which declares it with a detail that is a string or an object, the two shapes observed.",
       "sources": [
         {
           "url": "https://api.typesafe.ai/openapi.json",
           "says": "responses 200, 400 (HTTPBadRequestError, whose detail is a string or an object) and 422, since the snapshot retrieved 2026-10-24; 200 and 422 only before"
         },
         {
+          "url": "https://docs.typesafe.ai/api/errors",
+          "says": "400 Bad Request for a body that breaks a request rule; with max_tokens_exceeded, the request is longer than the model's context length"
+        },
+        {
           "url": "Observed 2026-09-25 with an API key",
           "says": "an unknown model: 400 {\"detail\":{\"error_type\":\"api_usage_error\",\"message\":...}}; too many options or levels: 400 with a string detail"
+        },
+        {
+          "url": "Observed 2026-11-09 with an API key",
+          "says": "a state of one short word repeated 45,000 times, sent without the long-context header: 400 {\"detail\":{\"error_type\":\"max_tokens_exceeded\"}}, with no message"
         }
       ],
-      "resolution": "400 is not retried: the same request would be refused again. api_usage_error is a known error type and appears in the exception message; the server's message, which names the model, does not. The declared detail is what the error reader already takes apart: an object yields its error type, a string yields nothing.",
+      "resolution": "400 is not retried: the same request would be refused again. api_usage_error and max_tokens_exceeded are known error types and appear in the exception message; the server's message, which names the model, does not. The declared detail is what the error reader already takes apart: an object yields its error type, a string yields nothing.",
       "checks": [
         { "pointer": "/paths/~1v1~1systemone/post/responses/400", "present": true },
         { "pointer": "/components/schemas/HTTPBadRequestError/properties/detail/anyOf", "contains": { "type": "string" } },

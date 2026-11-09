@@ -13,6 +13,7 @@ public sealed class OptionsTests
         var options = new JevClientOptions();
 
         Assert.Equal("jev-latest", options.DefaultModel);
+        Assert.False(options.UseLongContext);
         Assert.Equal(new Uri("https://api.typesafe.ai"), options.BaseAddress);
         Assert.Equal(TimeSpan.FromSeconds(30), options.Timeout);
         Assert.Equal(0, options.AdditionalRetries);
@@ -104,9 +105,11 @@ public sealed class OptionsTests
 
         options.DefaultModel = "changed";
         options.Timeout = TimeSpan.FromSeconds(1);
+        options.UseLongContext = true;
 
         Assert.Equal("jev-latest", settings.DefaultModel);
         Assert.Equal(TimeSpan.FromSeconds(30), settings.Timeout);
+        Assert.False(settings.UseLongContext);
     }
 
     [Fact]

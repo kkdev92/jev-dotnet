@@ -183,7 +183,7 @@ public sealed class JevClient
             var body = RequestBodyWriter.WriteEvaluate(call.Model, state, plan, _settings.MaxRequestBodyBytes);
             scope.Token.ThrowIfCancellationRequested();
 
-            var exchange = await ExchangeAsync(scope, HttpMethod.Post, _systemOneUri, body).ConfigureAwait(false);
+            var exchange = await ExchangeAsync(scope, HttpMethod.Post, _systemOneUri, body, call.UseLongContext).ConfigureAwait(false);
             var decoded = Decode(exchange, plan);
             var warnings = ConsistencyCheck.Run(plan, decoded, _settings.AbsoluteTolerance, _settings.RelativeTolerance, _settings.NumericalConsistency, exchange.RequestId);
 
@@ -226,7 +226,7 @@ public sealed class JevClient
             cancellationToken.ThrowIfCancellationRequested();
             await scope.AdmitAsync().ConfigureAwait(false);
 
-            var exchange = await ExchangeAsync(scope, HttpMethod.Get, _modelsUri, default).ConfigureAwait(false);
+            var exchange = await ExchangeAsync(scope, HttpMethod.Get, _modelsUri, default, longContext: false).ConfigureAwait(false);
 
             if (!Utf8.IsValid(exchange.Body))
             {
@@ -280,7 +280,7 @@ public sealed class JevClient
     /// the credential for the key again. The response is disposed before any backoff, so a waiting
     /// retry holds no connection. What returns holds no reference to a response or a stream.
     /// </remarks>
-    private async Task<Exchange> ExchangeAsync(CallScope scope, HttpMethod method, Uri uri, ArraySegment<byte> body)
+    private async Task<Exchange> ExchangeAsync(CallScope scope, HttpMethod method, Uri uri, ArraySegment<byte> body, bool longContext)
     {
         while (true)
         {
@@ -297,7 +297,7 @@ public sealed class JevClient
 
             TimeSpan? retryDelay;
 
-            using (var request = CreateRequest(method, uri, body, key))
+            using (var request = CreateRequest(method, uri, body, key, longContext))
             {
                 HttpResponseMessage response;
                 scope.Transmission = JevRequestTransmission.Unknown;
@@ -390,7 +390,7 @@ public sealed class JevClient
         return new JevHttpException(scope.Operation, (int)response.StatusCode, requestId, errorType, retryAfter, validationErrors, captured);
     }
 
-    private static HttpRequestMessage CreateRequest(HttpMethod method, Uri uri, ArraySegment<byte> body, string key)
+    private static HttpRequestMessage CreateRequest(HttpMethod method, Uri uri, ArraySegment<byte> body, string key, bool longContext)
     {
         var request = new HttpRequestMessage(method, uri)
         {
@@ -412,6 +412,11 @@ public sealed class JevClient
         request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
         request.Headers.TryAddWithoutValidation("Accept", "application/json");
         request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
+
+        if (longContext)
+        {
+            request.Headers.TryAddWithoutValidation(JevContract.LongContextHeader, JevContract.LongContextHeaderValue);
+        }
 
         return request;
     }
