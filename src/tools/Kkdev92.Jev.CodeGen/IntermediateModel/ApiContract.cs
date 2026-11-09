@@ -32,8 +32,12 @@ internal sealed record OperationDef(
     string? OperationId,
     string? RequestSchema,
     bool RequestRequired,
+    IReadOnlyList<HeaderDef> Headers,
     IReadOnlyList<ResponseDef> Responses,
     IReadOnlyList<string> SecuritySchemes);
+
+/// <summary>An optional request header that turns something on by being sent with its one allowed value.</summary>
+internal sealed record HeaderDef(string Name, string Value);
 
 /// <summary>A declared response: its status and, when it has a JSON body, the schema of that body.</summary>
 internal sealed record ResponseDef(string Status, string? Schema);

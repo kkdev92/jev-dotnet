@@ -61,6 +61,17 @@ public sealed class ErrorContractTests
     }
 
     [Fact]
+    public async Task ARequestLongerThanTheContextIsABadRequestNamedByItsErrorType()
+    {
+        var exception = await Fails<JevHttpException>(new FakeHttpMessageHandler((_, _) => Task.FromResult(FakeResponses.ContextLengthExceeded())));
+
+        Assert.Equal(400, exception.StatusCode);
+        Assert.Equal("max_tokens_exceeded", exception.ErrorType);
+        Assert.Contains("400 (Bad Request)", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Error type: max_tokens_exceeded.", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AValidationFailureCarriesItsCodesButNeverTheEchoedInput()
     {
         var exception = await Fails<JevHttpException>(new FakeHttpMessageHandler((_, _) => Task.FromResult(FakeResponses.ValidationFailed(StateSecret))));

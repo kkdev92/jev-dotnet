@@ -13,6 +13,9 @@ public sealed class JevRequestOptions
     /// <summary>The model for this call, instead of <see cref="JevClientOptions.DefaultModel"/>.</summary>
     public string? Model { get; set; }
 
+    /// <summary>Whether this evaluation asks for long context, instead of <see cref="JevClientOptions.UseLongContext"/>. Ignored when listing models.</summary>
+    public bool? UseLongContext { get; set; }
+
     /// <summary>The deadline for this call, instead of <see cref="JevClientOptions.Timeout"/>.</summary>
     public TimeSpan? Timeout { get; set; }
 

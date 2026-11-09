@@ -20,10 +20,12 @@ namespace Kkdev92.Jev.IntegrationTests;
 /// that exists only for this project is the opt-in.
 /// </para>
 /// <para>
-/// The budget is fixed and small: three evaluations of a few hundred tokens each and one model
-/// listing. Each evaluation settles one of the questions only an authenticated call can settle (the
-/// readme lists them under Known Limitations) rather than re-proving what the offline suites
-/// already cover. What needs no key — how a missing or wrong key is refused — is in
+/// The budget is fixed and small: four evaluations of a few hundred tokens each, one model listing,
+/// and one evaluation with a state too long for the default context, which the service refuses.
+/// TypeSafe does not say whether a refused request is billed; if it is, that one is most of a run.
+/// Each evaluation settles one of the questions only an authenticated call can settle (the readme
+/// lists them under Known Limitations) rather than re-proving what the offline suites already
+/// cover. What needs no key — how a missing or wrong key is refused — is in
 /// <see cref="KeylessLiveTests"/>. State and instructions are synthetic; nothing here should ever be
 /// real data.
 /// </para>
@@ -40,6 +42,9 @@ namespace Kkdev92.Jev.IntegrationTests;
 public sealed class LiveApiTests
 {
     private const string KeyVariable = "JEV_DOTNET_INTEGRATION_API_KEY";
+
+    // Spelled out rather than taken from the SDK, so the tests do not check the SDK against itself.
+    private const string LongContextHeader = "TypeSafe-Danger-Zone-Long-Context";
 
     private static string? Key => Environment.GetEnvironmentVariable(KeyVariable) is { Length: > 0 } key ? key : null;
 
@@ -79,7 +84,7 @@ public sealed class LiveApiTests
         }
         catch (JevHttpException ex)
         {
-            LiveReport.Write(title, ["**Refused by the service.**", .. LiveReport.Describe(ex)]);
+            LiveReport.Write(title, ["**Refused by the service.**", .. LiveReport.Describe(ex), "Shape of the response: " + LiveReport.Shape(recording.LastBody)]);
             throw;
         }
     }
@@ -206,5 +211,74 @@ public sealed class LiveApiTests
         LiveReport.Write(Title, ["Accepted.", .. LiveReport.Describe(result, new Dictionary<string, JevContent[]>())]);
 
         Assert.InRange(result.Get(positive).Probability, 0, 1);
+    }
+
+    /// <summary>
+    /// An evaluation that asks for long context is accepted.
+    /// </summary>
+    /// <remarks>
+    /// TypeSafe's contract declares the long-context header and its models page says what it does;
+    /// only a keyed call shows that the service takes the header as this SDK sends it. The
+    /// evaluation is a small one, far inside the default limits: it shows that asking is accepted
+    /// and the answer reads as usual, not that the limits rise. Showing that would take a state
+    /// longer than the default context, and it would be evaluated and billed in full.
+    /// </remarks>
+    [Fact]
+    public async Task AnEvaluationAskingForLongContextIsAccepted()
+    {
+        Assert.SkipWhen(Key is null, $"{KeyVariable} is not set; skipping live API tests.");
+
+        const string Title = "POST /v1/systemone: asking for long context";
+        var builder = new JevDecisionPlanBuilder();
+        var positive = builder.AddNoul("positive", "Is the message positive?");
+        var plan = builder.Build();
+
+        var recording = new Recording();
+        var result = await Observe(Title, recording, () => Client(Key!, recording).EvaluateAsync(
+            "Thanks, that fixed it!",
+            plan,
+            new JevRequestOptions { UseLongContext = true },
+            TestContext.Current.CancellationToken));
+
+        LiveReport.Write(Title, ["Accepted.", .. LiveReport.Describe(result, new Dictionary<string, JevContent[]>())]);
+
+        Assert.Contains(LongContextHeader, Assert.Single(recording.HeaderNames), StringComparer.OrdinalIgnoreCase);
+        Assert.InRange(result.Get(positive).Probability, 0, 1);
+    }
+
+    /// <summary>
+    /// A state too long for the default context is refused, without asking for long context.
+    /// </summary>
+    /// <remarks>
+    /// TypeSafe documents a <c>400</c> with <c>max_tokens_exceeded</c> for a request longer than the
+    /// model's context length, without saying where in the body the type appears. It has been seen
+    /// as <c>detail.error_type</c>, which is where the SDK reads it (<c>status-400</c> in
+    /// <c>spec/typesafe-v1/semantics.json</c>), and this is the call that shows it is still there.
+    /// If it moves, the report records the shape of the body before the test fails. The state is one
+    /// short word repeated — at about a token each, longer than the default per-question context and
+    /// shorter than the per-request one.
+    /// </remarks>
+    [Fact]
+    public async Task AStateTooLongForTheDefaultContextIsRefused()
+    {
+        Assert.SkipWhen(Key is null, $"{KeyVariable} is not set; skipping live API tests.");
+
+        const string Title = "POST /v1/systemone: a state too long for the default context";
+        var builder = new JevDecisionPlanBuilder();
+        builder.AddNoul("billing", "Is the text about billing?");
+        var plan = builder.Build();
+        var state = string.Concat(Enumerable.Repeat(" the", 45_000));
+
+        var recording = new Recording();
+        var client = Client(Key!, recording);
+        var refusal = await Assert.ThrowsAsync<JevHttpException>(async () =>
+        {
+            var result = await Observe(Title, recording, () => client.EvaluateAsync(state, plan, cancellationToken: TestContext.Current.CancellationToken));
+            LiveReport.Write(Title, ["**Accepted**, although TypeSafe documents a refusal.", .. LiveReport.Describe(result, new Dictionary<string, JevContent[]>())]);
+        });
+
+        Assert.DoesNotContain(LongContextHeader, Assert.Single(recording.HeaderNames), StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(400, refusal.StatusCode);
+        Assert.Equal("max_tokens_exceeded", refusal.ErrorType);
     }
 }

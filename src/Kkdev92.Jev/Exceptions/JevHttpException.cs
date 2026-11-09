@@ -22,6 +22,7 @@ public sealed class JevHttpException : JevException
     {
         "authentication_error",
         "api_usage_error",
+        "max_tokens_exceeded",
     };
 
     internal JevHttpException(
@@ -54,8 +55,9 @@ public sealed class JevHttpException : JevException
     /// <remarks>
     /// Passed through as the service sent it, when it is lower-case letters, digits and underscores,
     /// so that code can branch on a value this SDK has not seen yet. Only values this SDK knows
-    /// appear in <see cref="Exception.Message"/>: <c>authentication_error</c> on a 401 or 403, and
-    /// <c>api_usage_error</c> on a 400 such as an unknown model. The shape is observed, not
+    /// appear in <see cref="Exception.Message"/>: <c>authentication_error</c> on a 401 or 403,
+    /// <c>api_usage_error</c> on a 400 such as an unknown model, and <c>max_tokens_exceeded</c> on a
+    /// 400 for a request longer than the model's context length. The shape is observed, not
     /// documented: the OpenAPI document describes only the 422 body.
     /// </remarks>
     public string? ErrorType { get; }

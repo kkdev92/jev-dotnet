@@ -13,7 +13,7 @@ internal sealed record OperationKey(string Method, string Path)
     public override string ToString() => $"{Method} {Path}";
 }
 
-/// <summary><c>public-surface.json</c>: which operations the SDK exposes, which it refuses to, and which parts of an exposed operation it leaves out.</summary>
+/// <summary><c>public-surface.json</c>: which operations the SDK exposes and which headers of theirs it sends, which operations it refuses to expose, and which parts of an exposed operation it leaves out.</summary>
 internal sealed record PublicSurface(IReadOnlyList<ApprovedOperation> Operations, IReadOnlyList<OperationKey> Excluded, IReadOnlyList<OmittedPart> Omitted)
 {
     public const string FileName = "public-surface.json";
@@ -27,7 +27,12 @@ internal sealed record PublicSurface(IReadOnlyList<ApprovedOperation> Operations
             .Select(e => new ApprovedOperation(
                 new OperationKey(SpecJson.String(e, "method"), SpecJson.String(e, "path")),
                 SpecJson.String(e, "exposedAs"),
-                SpecJson.String(e, "constant")))
+                SpecJson.String(e, "constant"),
+                e.TryGetProperty("headers", out var headers)
+                    ? headers.EnumerateArray()
+                        .Select(h => new ApprovedHeader(SpecJson.String(h, "name"), SpecJson.String(h, "exposedAs"), SpecJson.String(h, "constant")))
+                        .ToList()
+                    : []))
             .ToList();
 
         var excluded = root.GetProperty("excluded").EnumerateArray()
@@ -66,12 +71,19 @@ internal sealed record OmittedPart(string Pointer, JsonElement Value, string Rea
     }
 }
 
-/// <summary>An operation the SDK exposes, the member that exposes it, and the name its generated constants take.</summary>
+/// <summary>An operation the SDK exposes, the member that exposes it, the name its generated constants take, and the headers it may send.</summary>
 /// <remarks>
 /// The constant name is written down rather than derived. The only candidates are the path's last
 /// segment, which gives <c>Systemone</c>, and the <c>operationId</c>, which is generated.
 /// </remarks>
-internal sealed record ApprovedOperation(OperationKey Key, string ExposedAs, string ConstantName);
+internal sealed record ApprovedOperation(OperationKey Key, string ExposedAs, string ConstantName, IReadOnlyList<ApprovedHeader> Headers);
+
+/// <summary>A header of an exposed operation that the SDK sends when asked to, the member that asks, and the name its generated constants take.</summary>
+/// <remarks>
+/// A header the document declares is never sent because the document declares it: each one is
+/// approved here or omitted, like an operation.
+/// </remarks>
+internal sealed record ApprovedHeader(string Name, string ExposedAs, string ConstantName);
 
 /// <summary><c>naming-overrides.json</c>: C# names that the naming rule would get wrong.</summary>
 internal sealed record NamingOverrides(IReadOnlyDictionary<string, string> Schemas)

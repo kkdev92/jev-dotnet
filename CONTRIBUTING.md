@@ -250,7 +250,8 @@ recorded there.
    and stops before every publishing job. Tags here are immutable, so a pipeline that fails after
    the tag exists costs a version number.
 4. Run the keyed live tests. This is the only check that sees a real answer, and it is billed:
-   three small evaluations and a model listing per run. They run locally, with the key in
+   four small evaluations, a model listing and one evaluation too long for the default context,
+   which the service refuses, per run. They run locally, with the key in
    `JEV_DOTNET_INTEGRATION_API_KEY` and a path for the report in `JEV_DOTNET_LIVE_REPORT`:
 
    ```bash

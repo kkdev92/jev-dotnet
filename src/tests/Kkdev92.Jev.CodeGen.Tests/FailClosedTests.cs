@@ -17,8 +17,23 @@ public sealed class FailClosedTests
         { "a maximum where nothing pins one", d => d.Property("SystemOneRequest", "questions")["maxProperties"] = 1024 },
         { "x-accepts that disagrees with the anyOf beside it", d => d.Property("NoulQuestion", "instructions")["x-accepts"] = "string" },
         { "x-accepts with no anyOf beside it", d => d.Property("Usage", "input_tokens")["x-accepts"] = "integer" },
-        { "an omitted header that became required", d => d["paths"]!["/v1/systemone"]!["post"]!["parameters"]![0]!["required"] = true },
-        { "a header beside the omitted ones", d => d["paths"]!["/v1/systemone"]!["post"]!["parameters"]!.AsArray().Add(new JsonObject { ["in"] = "header", ["name"] = "TypeSafe-Something-Else", ["schema"] = new JsonObject { ["type"] = "string" } }) },
+        { "an omitted header that became required", d => Parameters(d)[0]!["required"] = true },
+        {
+            "an omitted header that moved", d =>
+            {
+                var first = Parameters(d)[0]!;
+                Parameters(d).RemoveAt(0);
+                Parameters(d).Add(first);
+            }
+        },
+        { "a header beside the omitted ones", d => Parameters(d).Add(new JsonObject { ["in"] = "header", ["name"] = "TypeSafe-Something-Else", ["schema"] = new JsonObject { ["type"] = "string" } }) },
+        { "an approved header that became required", d => Parameters(d)[1]!["required"] = true },
+        { "an approved header that takes any string", d => Parameters(d)[1]!["schema"] = new JsonObject { ["type"] = "string" } },
+        { "an approved header with a second value", d => Parameters(d)[1]!["schema"]!["enum"]!.AsArray().Add("false") },
+        { "an approved header the document dropped", d => Parameters(d).RemoveAt(1) },
+        { "a switch header nobody classified", d => Parameters(d).Add(new JsonObject { ["in"] = "header", ["name"] = "TypeSafe-Danger-Zone-Other", ["schema"] = new JsonObject { ["enum"] = new JsonArray("true"), ["type"] = "string" } }) },
+        { "a header declared twice in different case", d => Parameters(d).Add(new JsonObject { ["in"] = "header", ["name"] = "typesafe-danger-zone-long-context", ["schema"] = new JsonObject { ["enum"] = new JsonArray("true"), ["type"] = "string" } }) },
+        { "a header name that is not a token", d => Parameters(d)[1]!["name"] = "Long Context" },
         { "an omitted schema the document no longer has", d => d["components"]!["schemas"]!.AsObject().Remove("BoxCoordinates") },
         { "a string format", d => d.Property("ModelMetadata", "release_date")["format"] = "date" },
         { "an enum", d => d.Property("ModelMetadata", "name")["enum"] = new JsonArray("jev-latest") },
@@ -31,7 +46,8 @@ public sealed class FailClosedTests
         { "an api key scheme", d => d["components"]!["securitySchemes"]!["HTTPBearer"]!["type"] = "apiKey" },
         { "OpenAPI 3.0", d => d["openapi"] = "3.0.3" },
         { "a non-JSON response", d => d["paths"]!["/v1/models"]!["get"]!["responses"]!["200"]!["content"]!.AsObject().Add("text/plain", new JsonObject { ["schema"] = new JsonObject { ["type"] = "string" } }) },
-        { "operation parameters", d => d["paths"]!["/v1/models"]!["get"]!["parameters"] = new JsonArray() },
+        { "a query parameter", d => d["paths"]!["/v1/models"]!["get"]!["parameters"] = new JsonArray(new JsonObject { ["in"] = "query", ["name"] = "limit", ["schema"] = new JsonObject { ["enum"] = new JsonArray("10"), ["type"] = "string" } }) },
+        { "parameters that are not a list", d => d["paths"]!["/v1/models"]!["get"]!["parameters"] = new JsonObject() },
         { "a typed object inside an anyOf", d => d.Property("SystemOneRequest", "state")["anyOf"]![1]!["additionalProperties"] = new JsonObject { ["type"] = "string" } },
         { "a required property that is not declared", d => d.Schema("Usage")["required"]!.AsArray().Add("cached_tokens") },
         { "a free-form object with a minimum", d => d.Property("ValidationError", "ctx")["minProperties"] = 1 },
@@ -41,6 +57,9 @@ public sealed class FailClosedTests
         { "an empty server list", d => d["servers"] = new JsonArray() },
         { "a server with variables", d => d["servers"] = new JsonArray(new JsonObject { ["url"] = "https://api.typesafe.ai", ["variables"] = new JsonObject() }) },
     };
+
+    /// <summary>The parameters of <c>POST /v1/systemone</c>: the omitted images header, then the approved long-context one.</summary>
+    private static JsonArray Parameters(JsonObject document) => document["paths"]!["/v1/systemone"]!["post"]!["parameters"]!.AsArray();
 
     [Theory]
     [MemberData(nameof(Unsupported))]

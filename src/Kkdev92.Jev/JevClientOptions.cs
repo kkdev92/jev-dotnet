@@ -34,10 +34,23 @@ public sealed class JevClientOptions
     /// <c>jev-latest</c> is an alias that moves when TypeSafe ships a release, so answers behind it
     /// can change without a change on your side. When results must stay comparable — confidence
     /// thresholds tuned on one version, an evaluation set — name a versioned model such as
-    /// <c>jev-1.13.0</c> instead. <see cref="JevResult.ActualModel"/> reports the version that
+    /// <c>jev-1.14.0</c> instead. <see cref="JevResult.ActualModel"/> reports the version that
     /// answered either way.
     /// </remarks>
     public string DefaultModel { get; set; } = DefaultModelName;
+
+    /// <summary>
+    /// Whether evaluations ask for long context. False by default.
+    /// </summary>
+    /// <remarks>
+    /// When true, every evaluation is sent with the <c>TypeSafe-Danger-Zone-Long-Context: true</c>
+    /// header, which raises both of the model's context limits, per request and per question (to
+    /// 262k tokens on Jev 1.13 and 1.14). TypeSafe documents long context as slower and less
+    /// accurate than staying within the default limits, so prefer turning it on for the calls that
+    /// need it with <see cref="JevRequestOptions.UseLongContext"/>. Listing models never sends the
+    /// header.
+    /// </remarks>
+    public bool UseLongContext { get; set; }
 
     /// <summary>
     /// The API origin. An absolute HTTPS URI with no path, query, fragment or user information.

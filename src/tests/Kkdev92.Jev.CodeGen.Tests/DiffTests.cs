@@ -113,6 +113,21 @@ public sealed class DiffTests
     }
 
     [Fact]
+    public void ANewHeaderIsFlaggedAndARemovedOrChangedOneIsBreaking()
+    {
+        static JsonArray Parameters(JsonObject d) => d["paths"]!["/v1/systemone"]!["post"]!["parameters"]!.AsArray();
+
+        var added = Diff(d => Parameters(d).Add(JsonNode.Parse("""{"in":"header","name":"TypeSafe-Danger-Zone-Other","schema":{"enum":["true"],"type":"string"}}""")));
+        Assert.Contains(added.Additive, l => l.Contains("new header TypeSafe-Danger-Zone-Other", StringComparison.Ordinal));
+
+        var removed = Diff(d => Parameters(d).RemoveAt(1));
+        Assert.Contains(removed.Breaking, l => l.Contains("no longer declares the header TypeSafe-Danger-Zone-Long-Context", StringComparison.Ordinal));
+
+        var changed = Diff(d => Parameters(d)[1]!["schema"]!["enum"] = new JsonArray("1"));
+        Assert.Contains(changed.Breaking, l => l.Contains("the header TypeSafe-Danger-Zone-Long-Context takes 1 where it took true", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void AStaleResolutionIsReported()
     {
         var report = Diff(d => d.Schema("ChoiceQuestion")["required"]!.AsArray().Add("instructions"));

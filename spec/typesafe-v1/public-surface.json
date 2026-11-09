@@ -1,24 +1,35 @@
 {
   "$comment": [
-    "Allowlist of operations this SDK exposes publicly, identified by method and path, and the parts of those operations it leaves out.",
+    "Allowlist of operations this SDK exposes publicly, identified by method and path, the headers of theirs it sends, and the parts of those operations it leaves out.",
     "Rules enforced by the generator:",
     "  - an entry here that is absent from openapi.json is a generation FAILURE",
     "  - an operation in openapi.json that is neither approved nor excluded is a generation FAILURE",
+    "  - a header of an approved operation that is neither approved under 'headers' nor omitted is a generation FAILURE, and",
+    "    so is an approved header the operation does not declare",
     "  - an omitted part must be in openapi.json exactly as 'equals' records it, or generation FAILS: the decision was about",
     "    that part as it was, not about whatever might later take its place. The parser reads the document without it, so it",
-    "    produces no code. Omitting a discriminator mapping entry omits its oneOf branch too",
+    "    produces no code. Omitting a discriminator mapping entry omits its oneOf branch too. An array element is named by its",
+    "    index in the document as committed",
     "  - changes to this file require human review: they widen or narrow the public surface",
     "operationId is deliberately not used: the document's ids (systemone_v1_systemone_post) are generated",
     "from the route, and the SDK's names should not depend on how the service generates them.",
     "Verified against info.version 0.2.0 on 2026-09-23: 2 operations exist, 2 are approved.",
-    "Omitted parts recorded on 2026-10-24 against the snapshot retrieved that day (still info.version 0.2.0)."
+    "Omitted parts recorded on 2026-10-24 against the snapshot retrieved that day (still info.version 0.2.0).",
+    "The long-context header approved on 2026-11-09 against the same snapshot: the document retrieved that day was byte-identical."
   ],
   "operations": [
     {
       "method": "POST",
       "path": "/v1/systemone",
       "exposedAs": "JevClient.EvaluateAsync, JevClient.EvaluateContentAsync",
-      "constant": "SystemOne"
+      "constant": "SystemOne",
+      "headers": [
+        {
+          "name": "TypeSafe-Danger-Zone-Long-Context",
+          "exposedAs": "JevClientOptions.UseLongContext, JevRequestOptions.UseLongContext",
+          "constant": "LongContext"
+        }
+      ]
     },
     {
       "method": "GET",
@@ -30,30 +41,18 @@
   "excluded": [],
   "omitted": [
     {
-      "pointer": "/paths/~1v1~1systemone/post/parameters",
-      "equals": [
-        {
-          "in": "header",
-          "name": "TypeSafe-Danger-Zone-Images",
-          "schema": {
-            "enum": [
-              "true"
-            ],
-            "type": "string"
-          }
-        },
-        {
-          "in": "header",
-          "name": "TypeSafe-Danger-Zone-Long-Context",
-          "schema": {
-            "enum": [
-              "true"
-            ],
-            "type": "string"
-          }
+      "pointer": "/paths/~1v1~1systemone/post/parameters/0",
+      "equals": {
+        "in": "header",
+        "name": "TypeSafe-Danger-Zone-Images",
+        "schema": {
+          "enum": [
+            "true"
+          ],
+          "type": "string"
         }
-      ],
-      "reason": "Two optional headers, TypeSafe-Danger-Zone-Images and TypeSafe-Danger-Zone-Long-Context, each switching on a feature this SDK does not expose: asset and box questions, and long context. The SDK sends neither."
+      },
+      "reason": "An optional header that switches on images and box questions, which this SDK does not expose. Never sent."
     },
     {
       "pointer": "/paths/~1v1~1systemone/post/requestBody/content/multipart~1form-data",
