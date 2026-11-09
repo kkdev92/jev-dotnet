@@ -16,7 +16,11 @@ Dates are UTC, taken from when the packages went to nuget.org.
 
 ## [Unreleased]
 
-Generated from the same snapshot of TypeSafe's contract as 0.1.2-alpha.
+## [0.2.0-alpha] - 2026-11-09
+
+Generated from the same snapshot of TypeSafe's contract as 0.1.2-alpha: OpenAPI document `3.1.0`,
+`info.version` `0.2.0` (document SHA-256 `3ca93b6e…75fbcf4`, contract SHA-256 `8b0cfc1c…79f4cddd`).
+The public surface gains what is listed under Added; nothing in it is removed or changed.
 
 ### Added
 
@@ -44,6 +48,8 @@ Generated from the same snapshot of TypeSafe's contract as 0.1.2-alpha.
 
 - `JevHttpException.Message` names `max_tokens_exceeded`, the error type TypeSafe sends with a
   `400` for a request longer than the model's context length. `ErrorType` already carried it.
+- `Kkdev92.Jev.DependencyInjection` depends on `Microsoft.Extensions.Http` and
+  `Microsoft.Extensions.Options` 10.0.14 or later, up from 10.0.13.
 
 ### Notes
 
@@ -150,7 +156,8 @@ retrieved 2026-09-22 (document SHA-256 `a191f8a7…c0360d5`, contract SHA-256
   endpoint has been checked only without a key: the `401` and `403` bodies, the response headers
   and HTTP/2. What only a keyed call can settle is listed under Known Limitations in the README.
 
-[Unreleased]: https://github.com/kkdev92/jev-dotnet/compare/v0.1.2-alpha...HEAD
+[Unreleased]: https://github.com/kkdev92/jev-dotnet/compare/v0.2.0-alpha...HEAD
+[0.2.0-alpha]: https://github.com/kkdev92/jev-dotnet/compare/v0.1.2-alpha...v0.2.0-alpha
 [0.1.2-alpha]: https://github.com/kkdev92/jev-dotnet/compare/v0.1.1-alpha...v0.1.2-alpha
 [0.1.1-alpha]: https://github.com/kkdev92/jev-dotnet/compare/v0.1.0-alpha...v0.1.1-alpha
 [0.1.0-alpha]: https://github.com/kkdev92/jev-dotnet/releases/tag/v0.1.0-alpha
