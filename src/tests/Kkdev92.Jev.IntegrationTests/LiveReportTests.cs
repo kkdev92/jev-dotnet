@@ -43,6 +43,29 @@ public sealed class LiveReportTests
     }
 
     [Fact]
+    public async Task ABoxIsDescribedEdgeByEdgeAsSpelled()
+    {
+        var builder = new JevDecisionPlanBuilder();
+        builder.AddBox("square", "the black square in `photo`");
+        builder.AddBox("crossed", "the white space in `photo`");
+        var plan = builder.Build();
+        var image = JevImage.FromBytes(TestImages.Png(320, 320));
+
+        var body = new SystemOneResponseBuilder()
+            .Raw("square", """{"type":"box","box":{"top":0.10,"bottom":0.4,"left":1e-1,"right":0.4,"unit":"fraction"},"confidence":0.875,"note":"x"}""")
+            .Box("crossed", 0.6, 0.3, 0.2, 0.7, null)
+            .Build();
+
+        var result = await Client(body).EvaluateContentAsync(JevContent.FromJson($$"""{"photo":"{{image.Reference}}"}"""), [image], plan, cancellationToken: TestContext.Current.CancellationToken);
+        var lines = LiveReport.Describe(result, new Dictionary<string, JevContent[]>());
+
+        Assert.Contains("`square` (box): top 0.10, bottom 0.4, left 1e-1, right 0.4; confidence 0.875; edges in order; fields the contract does not list: `unit`, `note`", lines);
+        Assert.Contains(lines, l => l.StartsWith("`crossed` (box): top 0.6, bottom 0.3, left 0.2, right 0.7; confidence null; edges cross by 0.3", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.StartsWith("SDK consistency warnings at the default tolerance: `crossed` BoxEdgeOrder 0.3", StringComparison.Ordinal));
+        Assert.Contains("Numbers in the answers: 9; most digits after the point: 3; exponent notation: yes", lines);
+    }
+
+    [Fact]
     public void TheShapeOfARefusedBodyNamesKindsAndNeverValues()
     {
         var body = Encoding.UTF8.GetBytes("""{"model":"a-model-name","answers":{"q":{"type":"noul","noul":0.5,"notes":["x"]}},"usage":{"input_tokens":null}}""");

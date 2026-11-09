@@ -144,6 +144,22 @@ internal static class DiffCommand
                 breaking.Add($"{key}: security changed from [{string.Join(", ", a.SecuritySchemes)}] to [{string.Join(", ", b.SecuritySchemes)}]");
             }
 
+            if (a.Form != b.Form)
+            {
+                if (a.Form is null)
+                {
+                    additive.Add($"{key}: now accepts the request as a multipart/form-data form, its JSON in the '{b.Form!.JsonPart}' part and {b.Form.FileMediaType} files beside it");
+                }
+                else if (b.Form is null)
+                {
+                    breaking.Add($"{key}: no longer accepts the request as a multipart/form-data form, which is how the SDK sends images");
+                }
+                else
+                {
+                    breaking.Add($"{key}: the multipart/form-data form moved its JSON from the '{a.Form.JsonPart}' part to '{b.Form.JsonPart}', with {b.Form.FileMediaType} files where there were {a.Form.FileMediaType}");
+                }
+            }
+
             var headersBefore = a.Headers.ToDictionary(h => h.Name, h => h.Value, StringComparer.Ordinal);
             var headersAfter = b.Headers.ToDictionary(h => h.Name, h => h.Value, StringComparer.Ordinal);
 
@@ -279,6 +295,26 @@ internal static class DiffCommand
             if (added != 0)
             {
                 (side.HasFlag(Side.Response) ? breaking : additive).Add($"{where} now admits {added} ({Describe(side)})");
+            }
+
+            return;
+        }
+
+        if (before is EnumRef eb && after is EnumRef ea)
+        {
+            var removedValues = eb.Values.Except(ea.Values, StringComparer.Ordinal).ToList();
+            var addedValues = ea.Values.Except(eb.Values, StringComparer.Ordinal).ToList();
+
+            // As with kinds: a value the service stops accepting breaks a sender, and a value it
+            // starts sending breaks a reader that checks the list.
+            if (removedValues.Count > 0)
+            {
+                (side.HasFlag(Side.Request) ? breaking : additive).Add($"{where} no longer admits {string.Join(", ", removedValues)} ({Describe(side)})");
+            }
+
+            if (addedValues.Count > 0)
+            {
+                (side.HasFlag(Side.Response) ? breaking : additive).Add($"{where} now admits {string.Join(", ", addedValues)} ({Describe(side)})");
             }
 
             return;

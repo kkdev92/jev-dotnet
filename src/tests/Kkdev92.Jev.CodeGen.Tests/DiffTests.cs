@@ -128,6 +128,36 @@ public sealed class DiffTests
     }
 
     [Fact]
+    public void AFormTheServiceStopsAcceptingIsBreakingAndAMovedPartToo()
+    {
+        static JsonObject Content(JsonObject d) => d["paths"]!["/v1/systemone"]!["post"]!["requestBody"]!["content"]!.AsObject();
+
+        var removed = Diff(d => Content(d).Remove("multipart/form-data"));
+        Assert.Contains(removed.Breaking, l => l.Contains("no longer accepts the request as a multipart/form-data form", StringComparison.Ordinal));
+
+        var moved = Diff(d =>
+        {
+            var schema = Content(d)["multipart/form-data"]!["schema"]!.AsObject();
+            var part = schema["properties"]!["request"]!.DeepClone();
+            schema["properties"] = new JsonObject { ["upload"] = part };
+            schema["required"] = new JsonArray("upload");
+            Content(d)["multipart/form-data"]!["encoding"] = new JsonObject { ["upload"] = new JsonObject { ["contentType"] = "application/json" } };
+        });
+        Assert.Contains(moved.Breaking, l => l.Contains("moved its JSON from the 'request' part to 'upload'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AValueTheServiceStopsAcceptingBreaksTheSenderAndANewOneIsAdditive()
+    {
+        var removed = Diff(d => d.Property("Asset", "format")["enum"] = new JsonArray("png", "jpg"));
+        Assert.Contains(removed.Breaking, l => l.Contains("Asset.format no longer admits jpeg", StringComparison.Ordinal));
+
+        var added = Diff(d => d.Property("Asset", "format")["enum"]!.AsArray().Add("webp"));
+        Assert.Empty(added.Breaking);
+        Assert.Contains(added.Additive, l => l.Contains("Asset.format now admits webp", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void AStaleResolutionIsReported()
     {
         var report = Diff(d => d.Schema("ChoiceQuestion")["required"]!.AsArray().Add("instructions"));

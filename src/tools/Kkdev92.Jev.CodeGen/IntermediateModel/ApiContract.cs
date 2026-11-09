@@ -27,6 +27,7 @@ internal sealed record ApiContract(
 }
 
 /// <summary>An HTTP operation.</summary>
+/// <param name="Form">The <c>multipart/form-data</c> form the request body may also be sent as, if the operation accepts one.</param>
 internal sealed record OperationDef(
     OperationKey Key,
     string? OperationId,
@@ -34,10 +35,19 @@ internal sealed record OperationDef(
     bool RequestRequired,
     IReadOnlyList<HeaderDef> Headers,
     IReadOnlyList<ResponseDef> Responses,
-    IReadOnlyList<string> SecuritySchemes);
+    IReadOnlyList<string> SecuritySchemes,
+    FormDef? Form);
 
 /// <summary>An optional request header that turns something on by being sent with its one allowed value.</summary>
 internal sealed record HeaderDef(string Name, string Value);
+
+/// <summary>
+/// A <c>multipart/form-data</c> request: the JSON body, the same schema as the <c>application/json</c>
+/// request, in one named part, and files of one media type in the parts after it.
+/// </summary>
+/// <param name="JsonPart">The name of the part that holds the JSON body.</param>
+/// <param name="FileMediaType">The media type every other part holds, such as <c>image/*</c>.</param>
+internal sealed record FormDef(string JsonPart, string FileMediaType);
 
 /// <summary>A declared response: its status and, when it has a JSON body, the schema of that body.</summary>
 internal sealed record ResponseDef(string Status, string? Schema);
@@ -94,8 +104,22 @@ internal sealed record ArrayRef(TypeRef Items, int? MinItems) : TypeRef;
 /// </remarks>
 internal sealed record JsonValueRef(JsonKinds Kinds) : TypeRef;
 
-/// <summary>A string property whose value is fixed. Only valid as a union's discriminator.</summary>
+/// <summary>
+/// A string property whose value is fixed: a union's discriminator, or an optional property
+/// outside a union, which is either absent or that value.
+/// </summary>
 internal sealed record ConstRef(string Value) : TypeRef;
+
+/// <summary>A string that takes one of a fixed list of values.</summary>
+/// <remarks>Compared by its values, in order: a record compares a list member by reference.</remarks>
+internal sealed record EnumRef(IReadOnlyList<string> Values) : TypeRef
+{
+    public bool Equals(EnumRef? other) => other is not null && Values.SequenceEqual(other.Values, StringComparer.Ordinal);
+
+    public override int GetHashCode() => Values.Aggregate(0, (hash, value) => HashCode.Combine(hash, StringComparer.Ordinal.GetHashCode(value)));
+
+    public override string ToString() => $"EnumRef [{string.Join(", ", Values)}]";
+}
 
 internal enum PrimitiveKind
 {

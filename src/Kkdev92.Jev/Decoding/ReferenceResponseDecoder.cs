@@ -93,6 +93,7 @@ internal static class ReferenceResponseDecoder
                 },
                 (ChoiceQuestionDefinition question, Wire.ChoiceAnswer choice) => MapChoice(question, choice, probabilities, tolerance),
                 (ScoreQuestionDefinition question, Wire.ScoreAnswer score) => MapScore(question, score, probabilities, out legends![slot], tolerance),
+                (BoxQuestionDefinition question, Wire.BoxAnswer box) => MapBox(question, box, probabilities, tolerance),
                 _ => throw Error(JevProtocolError.AnswerTypeMismatch),
             };
         }
@@ -178,6 +179,39 @@ internal static class ReferenceResponseDecoder
         {
             Value = InRange(answer.Score, levels - 1, tolerance),
             Confidence = InRange(answer.Confidence, 1, tolerance),
+            Selected = -1,
+        };
+    }
+
+    private static AnswerSlot MapBox(BoxQuestionDefinition question, Wire.BoxAnswer answer, double[] numbers, double tolerance)
+    {
+        var offset = question.ProbabilityOffset;
+        numbers[offset + BoxQuestionDefinition.Top] = InRange(answer.Box.Top, 1, tolerance);
+        numbers[offset + BoxQuestionDefinition.Bottom] = InRange(answer.Box.Bottom, 1, tolerance);
+        numbers[offset + BoxQuestionDefinition.Left] = InRange(answer.Box.Left, 1, tolerance);
+        numbers[offset + BoxQuestionDefinition.Right] = InRange(answer.Box.Right, 1, tolerance);
+
+        // The generated model keeps the confidence as a JSON value, since the contract lets it be
+        // null; its validation has already checked that it is a number or null.
+        double confidence;
+
+        if (answer.Confidence.ValueKind == JsonValueKind.Null)
+        {
+            confidence = double.NaN;
+        }
+        else if (!answer.Confidence.TryGetDouble(out confidence) || !double.IsFinite(confidence))
+        {
+            throw Error(JevProtocolError.NonFiniteNumber);
+        }
+        else
+        {
+            confidence = InRange(confidence, 1, tolerance);
+        }
+
+        return new AnswerSlot
+        {
+            Value = double.NaN,
+            Confidence = confidence,
             Selected = -1,
         };
     }

@@ -85,13 +85,32 @@ public sealed class GeneratorTests
     {
         var files = Generate().Keys.ToList();
 
-        Assert.Equal(19, files.Count);
+        Assert.Equal(23, files.Count);
         Assert.Contains("JevContract.g.cs", files);
         Assert.Contains("JevWireJsonContext.g.cs", files);
         Assert.Contains("Wire/SystemOneRequest.g.cs", files);
         Assert.Contains("Wire/HttpValidationError.g.cs", files);
         Assert.Contains("Wire/HttpBadRequestError.g.cs", files);
-        Assert.DoesNotContain("Wire/BoxQuestion.g.cs", files);
+        Assert.Contains("Wire/Asset.g.cs", files);
+        Assert.Contains("Wire/BoxQuestion.g.cs", files);
+        Assert.Contains("Wire/BoxAnswer.g.cs", files);
+        Assert.Contains("Wire/BoxCoordinates.g.cs", files);
+    }
+
+    /// <summary>
+    /// The form that carries images becomes two constants, and a string with a fixed list of values
+    /// a check against that list, so an asset the SDK writes is held to the document's formats.
+    /// </summary>
+    [Fact]
+    public void TheFormAndTheListedValuesAreGenerated()
+    {
+        var files = Generate();
+
+        Assert.Contains("public const string SystemOneFormJsonPart = \"request\";", files["JevContract.g.cs"], StringComparison.Ordinal);
+        Assert.Contains("public const string SystemOneFormFileMediaType = \"image/*\";", files["JevContract.g.cs"], StringComparison.Ordinal);
+        Assert.Contains("public const string ImagesHeader = \"TypeSafe-Danger-Zone-Images\";", files["JevContract.g.cs"], StringComparison.Ordinal);
+        Assert.Contains("validation.OneOf(Format, [\"png\", \"jpg\", \"jpeg\"], ", files["Wire/Asset.g.cs"], StringComparison.Ordinal);
+        Assert.Contains("validation.OneOf(Type, [\"image\"], ", files["Wire/Asset.g.cs"], StringComparison.Ordinal);
     }
 
     [Fact]

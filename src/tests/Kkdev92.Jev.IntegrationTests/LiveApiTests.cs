@@ -1,4 +1,5 @@
 using Kkdev92.Jev.DependencyInjection;
+using Kkdev92.Jev.TestSupport;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Kkdev92.Jev.IntegrationTests;
@@ -20,8 +21,9 @@ namespace Kkdev92.Jev.IntegrationTests;
 /// that exists only for this project is the opt-in.
 /// </para>
 /// <para>
-/// The budget is fixed and small: four evaluations of a few hundred tokens each, one model listing,
-/// and one evaluation with a state too long for the default context, which the service refuses.
+/// The budget is fixed and small: seven small evaluations — three of them showing a small synthetic
+/// image — one model listing, and one evaluation with a state too long for the default context,
+/// which the service refuses.
 /// TypeSafe does not say whether a refused request is billed; if it is, that one is most of a run.
 /// Each evaluation settles one of the questions only an authenticated call can settle (the readme
 /// lists them under Known Limitations) rather than re-proving what the offline suites already
@@ -45,6 +47,7 @@ public sealed class LiveApiTests
 
     // Spelled out rather than taken from the SDK, so the tests do not check the SDK against itself.
     private const string LongContextHeader = "TypeSafe-Danger-Zone-Long-Context";
+    private const string ImagesHeader = "TypeSafe-Danger-Zone-Images";
 
     private static string? Key => Environment.GetEnvironmentVariable(KeyVariable) is { Length: > 0 } key ? key : null;
 
@@ -244,6 +247,106 @@ public sealed class LiveApiTests
 
         Assert.Contains(LongContextHeader, Assert.Single(recording.HeaderNames), StringComparer.OrdinalIgnoreCase);
         Assert.InRange(result.Get(positive).Probability, 0, 1);
+    }
+
+    /// <summary>
+    /// A state that shows an image is accepted, sent as a form.
+    /// </summary>
+    /// <remarks>
+    /// TypeSafe documents images as experimental: a form whose first part is the request, a
+    /// reference in the state standing for each image, and a header that turns images on. Only a
+    /// keyed call shows that the service takes the form as this SDK writes it — each image a file
+    /// part with a filename and its media type. The image is made by the test: a black square on
+    /// white. Whether the model sees the square is reported, not asserted.
+    /// </remarks>
+    [Fact]
+    public async Task AStateThatShowsAnImageIsAccepted()
+    {
+        Assert.SkipWhen(Key is null, $"{KeyVariable} is not set; skipping live API tests.");
+
+        const string Title = "POST /v1/systemone: an image in the state";
+        var photo = JevImage.FromBytes(TestImages.Png(320, 320, (32, 32, 96)));
+        var builder = new JevDecisionPlanBuilder();
+        var square = builder.AddNoul("square", "Is there a black square in `photo`?");
+        var plan = builder.Build();
+        var state = JevContent.FromJson($$"""{"photo":"{{photo.Reference}}"}""");
+
+        var recording = new Recording();
+        var result = await Observe(Title, recording, () => Client(Key!, recording).EvaluateContentAsync(state, [photo], plan, cancellationToken: TestContext.Current.CancellationToken));
+
+        LiveReport.Write(Title, ["Accepted.", .. LiveReport.Describe(result, new Dictionary<string, JevContent[]>())]);
+
+        Assert.Contains(ImagesHeader, Assert.Single(recording.HeaderNames), StringComparer.OrdinalIgnoreCase);
+        Assert.InRange(result.Get(square).Probability, 0, 1);
+    }
+
+    /// <summary>
+    /// A box question about an image is answered with four edges.
+    /// </summary>
+    /// <remarks>
+    /// The square covers 0.1 to 0.4 of the image's width and of its height. Where the model puts the
+    /// box is reported beside that, not asserted: TypeSafe says the accuracy of box answers will
+    /// change as it updates its models. What is asserted is what the contract promises — four edges
+    /// from 0 to 1, which the SDK checked as it read them, and a confidence from 0 to 1 when there is
+    /// one.
+    /// </remarks>
+    [Fact]
+    public async Task ABoxQuestionIsAnsweredWithFourEdges()
+    {
+        Assert.SkipWhen(Key is null, $"{KeyVariable} is not set; skipping live API tests.");
+
+        const string Title = "POST /v1/systemone: a box question";
+        var photo = JevImage.FromBytes(TestImages.Png(320, 320, (32, 32, 96)));
+        var builder = new JevDecisionPlanBuilder();
+        var square = builder.AddBox("square", "the black square in `photo`");
+        var plan = builder.Build();
+        var state = JevContent.FromJson($$"""{"photo":"{{photo.Reference}}"}""");
+
+        var recording = new Recording();
+        var result = await Observe(Title, recording, () => Client(Key!, recording).EvaluateContentAsync(state, [photo], plan, cancellationToken: TestContext.Current.CancellationToken));
+
+        LiveReport.Write(Title, ["Accepted. The square covers top 0.1, bottom 0.4, left 0.1, right 0.4.", .. LiveReport.Describe(result, new Dictionary<string, JevContent[]>())]);
+
+        var box = result.Get(square);
+        Assert.Contains(ImagesHeader, Assert.Single(recording.HeaderNames), StringComparer.OrdinalIgnoreCase);
+        Assert.All([box.Top, box.Bottom, box.Left, box.Right], edge => Assert.InRange(edge, 0, 1));
+
+        if (box.Confidence is { } confidence)
+        {
+            Assert.InRange(confidence, 0, 1);
+        }
+    }
+
+    /// <summary>
+    /// An image a question shows and an image the state shows are accepted together.
+    /// </summary>
+    /// <remarks>
+    /// TypeSafe's documentation puts a target image's reference directly in a question's
+    /// instructions, and refuses an image that nothing in the request references. This is the call
+    /// that shows a reference in the instructions counts — the plan's image is referenced nowhere
+    /// else — with the plan's image sent first and the state's after it.
+    /// </remarks>
+    [Fact]
+    public async Task AnImageInTheInstructionsAndOneInTheStateAreAcceptedTogether()
+    {
+        Assert.SkipWhen(Key is null, $"{KeyVariable} is not set; skipping live API tests.");
+
+        const string Title = "POST /v1/systemone: an image in the instructions and one in the state";
+        var card = JevImage.FromBytes(TestImages.Png(320, 320, (32, 32, 96)));
+        var photo = JevImage.FromBytes(TestImages.Png(320, 320, (192, 160, 96)));
+        var builder = new JevDecisionPlanBuilder();
+        var same = builder.AddNoul("same", $"Is the shape in `photo` the same as the shape in this picture: {card.Reference}?");
+        builder.AddImage(card);
+        var plan = builder.Build();
+        var state = JevContent.FromJson($$"""{"photo":"{{photo.Reference}}"}""");
+
+        var recording = new Recording();
+        var result = await Observe(Title, recording, () => Client(Key!, recording).EvaluateContentAsync(state, [photo], plan, cancellationToken: TestContext.Current.CancellationToken));
+
+        LiveReport.Write(Title, ["Accepted.", .. LiveReport.Describe(result, new Dictionary<string, JevContent[]>())]);
+
+        Assert.Contains(ImagesHeader, Assert.Single(recording.HeaderNames), StringComparer.OrdinalIgnoreCase);
+        Assert.InRange(result.Get(same).Probability, 0, 1);
     }
 
     /// <summary>

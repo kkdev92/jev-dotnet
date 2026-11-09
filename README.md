@@ -202,6 +202,9 @@ compared ordinally. A question id is only a key: TypeSafe's [HTTP reference](htt
 says it is not sent to the model and not used in inference. `default` instructions leave the field
 out; `JevContent.Null` sends an explicit `null`.
 
+A fourth kind, the box question, finds where something is in an image. It is experimental, and
+has [its own section](#images-and-box-questions-experimental).
+
 ### Three ways to send the state
 
 ```csharp
@@ -258,6 +261,52 @@ question; one that does not is refused with `400`, and `JevHttpException.ErrorTy
 TypeSafe documents long context as slower and less accurate than staying within the default
 limits, so ask for it on the calls that need it; `JevClientOptions.UseLongContext` asks for it on
 every evaluation. The limits are on TypeSafe's [models page](https://docs.typesafe.ai/models).
+
+### Images and box questions (experimental)
+
+TypeSafe marks images and box questions as experimental: the request format, the answers and the
+limits can change between its releases, and so can the members of this SDK that use them —
+`JevImage`, `AddImage`, `AddBox`, `BoxAnswer` and the overloads that take images. They are marked
+`[Experimental("JEV001")]`, so using one is a compile error until you opt in:
+
+```xml
+<PropertyGroup>
+  <NoWarn>$(NoWarn);JEV001</NoWarn>
+</PropertyGroup>
+```
+
+An image travels with the request, and you write its reference — a string the SDK makes —
+wherever the image belongs; the model receives the image in its place:
+
+```csharp
+var photo = JevImage.FromBytes(File.ReadAllBytes("counter.jpg"));   // PNG or JPEG
+
+var builder = new JevDecisionPlanBuilder();
+var visible = builder.AddNoul("mug_visible", "Is there a coffee mug in `photo`?");
+var mug = builder.AddBox("mug", "the coffee mug in `photo`");
+var plan = builder.Build();
+
+var state = JevContent.FromJson($$"""{"photo":"{{photo.Reference}}"}""");
+var result = await client.EvaluateContentAsync(state, [photo], plan);
+
+var box = result.Get(mug);   // Top, Bottom, Left, Right: fractions of the image from its top-left corner
+```
+
+A box answer is always four edges — there is no "not found" — so ask a noul beside it, as above,
+and ignore the box when the noul says no. To crop or draw, multiply `Left` and `Right` by the
+image's width and `Top` and `Bottom` by its height. Edges that cross are reported like any other
+inconsistency, as `JevConsistencyCheck.BoxEdgeOrder`.
+
+An image a question shows — a badge photo to match against, say — belongs to the plan instead:
+write its reference in the question's instructions or criteria, add it with
+`builder.AddImage(badge)`, and every call sends it.
+
+A request with an image or a box question is sent as `multipart/form-data`, with the header
+`TypeSafe-Danger-Zone-Images: true`. Before anything is sent, the SDK refuses images and references
+that do not match — an image no text references, a reference whose image is not sent — and a box
+question with no image to look at. Images count towards `JevClientOptions.MaxRequestBodyBytes`,
+4 MiB by default, which applies to the whole form; raise it for larger images. The sizes TypeSafe
+accepts are on its [images page](https://docs.typesafe.ai/images).
 
 ### Handle errors
 
@@ -353,10 +402,13 @@ every client it creates, and redacts header values unless told otherwise.
   `400`; the SDK refuses before sending. 1,024 questions and 1 MiB of encoded questions per plan are
   this SDK's. A request under every local limit can still exceed the model's context, which is
   counted in tokens the SDK cannot count
-- **No box questions or images.** TypeSafe's OpenAPI document describes a box question, images
-  sent with a request, and an opt-in header for them. This SDK sends none of them, and refuses a box
-  answer like any answer of a type it does not know. What is left out, and why, is listed in
-  `spec/typesafe-v1/public-surface.json`
+- **Images and box questions are experimental, at TypeSafe and here.** Keyed calls have shown the
+  service accepting the form as this SDK writes it — a PNG in the state, a PNG in a question's
+  instructions beside one in the state, and a box question — and answering in the documented
+  shape. JPEG has been checked offline only, and the base64 form of an image is not used. The SDK
+  checks an image's format and its references, not its size: the pixel and byte limits on
+  TypeSafe's images page can change between its releases, so they are left to the service, which
+  refuses an image outside them
 - **That long context raises the limits is TypeSafe's word.** A keyed evaluation that asks for it
   is accepted, and a state too long for the default context, sent without it, is refused with `400`
   and `max_tokens_exceeded`; no keyed call has yet sent a state that long with long context on
@@ -383,7 +435,7 @@ commit and review                 the contract is a reviewable file
         v
 offline generator                 allowlist, recorded conflicts, fail-closed on anything unknown
         v
-generated wire types (internal)   19 files, compared byte for byte in CI
+generated wire types (internal)   23 files, compared byte for byte in CI
         v
 handwritten runtime               plans, the response reader, deadline, retry, errors
 ```

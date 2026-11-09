@@ -116,6 +116,9 @@ public sealed class SystemOneResponseBuilder
         return Raw(id, $$"""{"type":"score","score":{{N(score)}},"confidence":{{N(confidence)}},"legend":{{legendJson}},"probabilities":{{probabilitiesJson}}}""");
     }
 
+    public SystemOneResponseBuilder Box(string id, double top, double bottom, double left, double right, double? confidence)
+        => Raw(id, $$"""{"type":"box","box":{"top":{{N(top)}},"bottom":{{N(bottom)}},"left":{{N(left)}},"right":{{N(right)}}},"confidence":{{(confidence is { } c ? N(c) : "null")}}}""");
+
     /// <summary>An answer written verbatim, for bodies no builder method produces.</summary>
     public SystemOneResponseBuilder Raw(string id, string answerJson)
     {

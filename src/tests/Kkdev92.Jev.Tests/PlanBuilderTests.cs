@@ -51,7 +51,7 @@ public sealed class PlanBuilderTests
         builder.AddNoul("n", JevContent.FromJson("""{"question":"Is it?","data":[1,true,null]}"""), new JevNoulCriteria("yes", JevContent.Null));
         var plan = builder.Build();
 
-        var body = RequestBodyWriter.WriteEvaluate("jev-latest", StateSource.FromContent(JevContent.FromJson("""{"message":"hi"}""")), plan, 1 << 20);
+        var body = RequestBodyWriter.WriteEvaluate("jev-latest", StateSource.FromContent(JevContent.FromJson("""{"message":"hi"}""")), plan, [], 1 << 20).Json;
         var request = JsonSerializer.Deserialize(body, JevWireJsonContext.Default.SystemOneRequest)!;
 
         var validation = new WireValidation();
@@ -82,7 +82,7 @@ public sealed class PlanBuilderTests
     {
         var (plan, _, _, _) = Triage();
 
-        var body = RequestBodyWriter.WriteEvaluate("jev-1.13.0", StateSource.FromContent("{\"x\":1}"), plan, 1 << 20);
+        var body = RequestBodyWriter.WriteEvaluate("jev-1.13.0", StateSource.FromContent("{\"x\":1}"), plan, [], 1 << 20).Json;
         var text = Encoding.UTF8.GetString(body);
 
         // A string that looks like JSON is still a string.
@@ -107,7 +107,7 @@ public sealed class PlanBuilderTests
         var plan = builder.Build();
 
         const string state = "請求が二重です <b>&'\"</b> 😀";
-        var body = RequestBodyWriter.WriteEvaluate("jev-latest", StateSource.FromContent(state), plan, 1 << 20);
+        var body = RequestBodyWriter.WriteEvaluate("jev-latest", StateSource.FromContent(state), plan, [], 1 << 20).Json;
         var text = Encoding.UTF8.GetString(body);
 
         Assert.Contains("請求が二重です", text, StringComparison.Ordinal);
@@ -141,8 +141,8 @@ public sealed class PlanBuilderTests
     {
         var (plan, _, _, _) = Triage();
 
-        var first = RequestBodyWriter.WriteEvaluate("jev-latest", StateSource.FromContent("one"), plan, 1 << 20);
-        var second = RequestBodyWriter.WriteEvaluate("jev-latest", StateSource.FromContent("two"), plan, 1 << 20);
+        var first = RequestBodyWriter.WriteEvaluate("jev-latest", StateSource.FromContent("one"), plan, [], 1 << 20).Json;
+        var second = RequestBodyWriter.WriteEvaluate("jev-latest", StateSource.FromContent("two"), plan, [], 1 << 20).Json;
 
         Assert.NotSame(first, second);
         Assert.Equal((byte)'}', first[^1]);

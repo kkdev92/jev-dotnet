@@ -17,7 +17,7 @@ public sealed class ValidatorTests
         var validated = Validate(SpecFixture.Committed());
 
         Assert.Equal(["GET /v1/models", "POST /v1/systemone"], validated.Operations.Select(o => o.Definition.Key.ToString()));
-        Assert.Equal(17, validated.ReachableSchemas.Count);
+        Assert.Equal(21, validated.ReachableSchemas.Count);
         Assert.Empty(validated.Warnings);
     }
 
@@ -51,13 +51,34 @@ public sealed class ValidatorTests
     }
 
     [Fact]
-    public void TheApprovedHeaderIsExposedWithItsConstant()
+    public void TheApprovedHeadersAreExposedWithTheirConstants()
     {
         var systemOne = Validate(SpecFixture.Committed()).Operations.Single(o => o.Approval.ConstantName == "SystemOne");
 
-        var header = Assert.Single(systemOne.Approval.Headers);
-        Assert.Equal(("TypeSafe-Danger-Zone-Long-Context", "LongContext"), (header.Name, header.ConstantName));
-        Assert.Equal("true", Assert.Single(systemOne.Definition.Headers).Value);
+        Assert.Equal(
+            [("TypeSafe-Danger-Zone-Images", "Images"), ("TypeSafe-Danger-Zone-Long-Context", "LongContext")],
+            systemOne.Approval.Headers.Select(h => (h.Name, h.ConstantName)));
+        Assert.Equal(2, systemOne.Definition.Headers.Count);
+        Assert.All(systemOne.Definition.Headers, h => Assert.Equal("true", h.Value));
+    }
+
+    /// <summary>An approved header is found by its name, wherever the document lists it.</summary>
+    [Fact]
+    public void AnApprovedHeaderMayMoveInTheList()
+    {
+        var snapshot = SpecFixture.With(d =>
+        {
+            var parameters = d["paths"]!["/v1/systemone"]!["post"]!["parameters"]!.AsArray();
+            var first = parameters[0]!;
+            parameters.RemoveAt(0);
+            parameters.Add(first);
+        });
+
+        var systemOne = Validate(snapshot).Operations.Single(o => o.Approval.ConstantName == "SystemOne");
+
+        Assert.Equal(
+            ["TypeSafe-Danger-Zone-Images", "TypeSafe-Danger-Zone-Long-Context"],
+            systemOne.Definition.Headers.Select(h => h.Name).Order(StringComparer.Ordinal));
     }
 
     /// <summary>A header is sent because public-surface.json says so, never because the document declares it.</summary>

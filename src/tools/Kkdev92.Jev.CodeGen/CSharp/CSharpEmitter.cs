@@ -28,7 +28,7 @@ namespace Kkdev92.Jev.CodeGen.CSharp;
 internal static partial class CSharpEmitter
 {
     /// <summary>Bumped by hand when a change to this emitter changes its output.</summary>
-    public const int GeneratorVersion = 3;
+    public const int GeneratorVersion = 4;
 
     public const string Namespace = "Kkdev92.Jev.Wire";
     public const string ContextName = "JevWireJsonContext";
@@ -125,7 +125,8 @@ internal static partial class CSharpEmitter
         writer.Line($"/// <summary>The <c>{obj.WireName}</c> schema.</summary>");
         writer.Open($"internal sealed class {obj.CSharpName}{baseClass}");
 
-        var emitted = obj.Properties.Where(p => p.Type is not ConstRef).OrderBy(p => p.CSharpName, StringComparer.Ordinal).ToList();
+        // A union member's discriminator is written and read by the serializer, not by a property.
+        var emitted = obj.Properties.Where(p => obj.Union is null || p.Type is not ConstRef).OrderBy(p => p.CSharpName, StringComparer.Ordinal).ToList();
 
         foreach (var property in emitted)
         {
@@ -272,7 +273,19 @@ internal static partial class CSharpEmitter
                     break;
                 }
 
-            case ConstRef:
+            // No pattern variable for these: one declared in an if condition stays in scope after the
+            // statement, so two optional strings of one object would declare it twice. A property is
+            // read twice instead, which for these plain models costs nothing.
+            case EnumRef listed:
+                writer.Line(required
+                    ? $"validation.OneOf({access}, {Values(listed.Values)}, {path});"
+                    : $"if ({access} is not null) validation.OneOf({access}, {Values(listed.Values)}, {path});");
+                break;
+
+            case ConstRef constant:
+                // Only an optional one reaches here: a union's discriminator is not emitted, and the
+                // parser refuses a required one outside a union.
+                writer.Line($"if ({access} is not null) validation.OneOf({access}, {Values([constant.Value])}, {path});");
                 break;
 
             default:
@@ -299,6 +312,9 @@ internal static partial class CSharpEmitter
             case PrimitiveRef { Kind: PrimitiveKind.Integer }:
                 throw new InvalidDataException("An integer inside a collection is not supported; nothing in the contract has needed one.");
 
+            case EnumRef or ConstRef:
+                throw new InvalidDataException("A constant or an enum inside a collection is not supported; nothing in the contract has needed one.");
+
             default:
                 WriteValidation(writer, access, type, required: true, path, contract, depth);
                 break;
@@ -307,7 +323,7 @@ internal static partial class CSharpEmitter
 
     private static string TypeName(TypeRef type, ApiContract contract) => type switch
     {
-        PrimitiveRef { Kind: PrimitiveKind.String } => "string",
+        PrimitiveRef { Kind: PrimitiveKind.String } or EnumRef or ConstRef => "string",
         PrimitiveRef { Kind: PrimitiveKind.Number } => "double",
         PrimitiveRef { Kind: PrimitiveKind.Integer } => "long",
         SchemaRef s => contract.Schema(s.WireName).CSharpName,
@@ -318,7 +334,10 @@ internal static partial class CSharpEmitter
         _ => throw new InvalidOperationException($"No C# type for {type}."),
     };
 
-    private static bool IsReference(TypeRef type) => type is PrimitiveRef { Kind: PrimitiveKind.String } or SchemaRef or NullableRef or MapRef or ArrayRef;
+    private static bool IsReference(TypeRef type) => type is PrimitiveRef { Kind: PrimitiveKind.String } or EnumRef or ConstRef or SchemaRef or NullableRef or MapRef or ArrayRef;
+
+    /// <summary>A collection expression of string literals, which a <c>ReadOnlySpan&lt;string&gt;</c> parameter takes without allocating.</summary>
+    private static string Values(IEnumerable<string> values) => "[" + string.Join(", ", values.Select(CodeWriter.Literal)) + "]";
 
     private static string Kinds(JsonKinds kinds)
     {
@@ -385,8 +404,8 @@ internal static partial class CSharpEmitter
         writer.Line();
         writer.Line("/// <summary>");
         writer.Line("/// The facts about the contract that the handwritten runtime depends on, generated so that they cannot");
-        writer.Line("/// drift from the snapshot: where the operations are, the headers they may be sent with, and the");
-        writer.Line("/// constants recorded in semantics.json.");
+        writer.Line("/// drift from the snapshot: where the operations are, the form and the headers they may be sent with,");
+        writer.Line("/// and the constants recorded in semantics.json.");
         writer.Line("/// </summary>");
         writer.Open($"internal static class {ContractClassName}");
 
@@ -414,6 +433,16 @@ internal static partial class CSharpEmitter
             writer.Line();
             writer.Line($"/// <summary>The path of <c>{Xml(operation.Definition.Key.ToString())}</c>.</summary>");
             writer.Line($"public const string {name}Path = {CodeWriter.Literal(operation.Definition.Key.Path)};");
+
+            if (operation.Definition.Form is { } form)
+            {
+                writer.Line();
+                writer.Line($"/// <summary>The name of the part that holds the JSON body when <c>{Xml(operation.Definition.Key.ToString())}</c> is sent as a form.</summary>");
+                writer.Line($"public const string {name}FormJsonPart = {CodeWriter.Literal(form.JsonPart)};");
+                writer.Line();
+                writer.Line($"/// <summary>The media type every other part of that form holds.</summary>");
+                writer.Line($"public const string {name}FormFileMediaType = {CodeWriter.Literal(form.FileMediaType)};");
+            }
 
             foreach (var approval in operation.Approval.Headers.OrderBy(h => h.ConstantName, StringComparer.Ordinal))
             {

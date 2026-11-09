@@ -247,6 +247,9 @@ public readonly struct JevContent : IEquatable<JevContent>
     /// <summary>The text, for the SDK's own writers.</summary>
     internal string? Text => Kind == JevContentKind.Text ? (string)_value! : null;
 
+    /// <summary>The compact UTF-8 JSON of an object or an array, for the SDK's own readers. Not to be changed.</summary>
+    internal byte[]? Json => Kind is JevContentKind.Object or JevContentKind.Array ? (byte[])_value! : null;
+
     /// <summary>True when the text, if any, can be sent unchanged.</summary>
     internal bool IsWellFormed => Kind != JevContentKind.Text || TextRules.IsWellFormed((string)_value!);
 

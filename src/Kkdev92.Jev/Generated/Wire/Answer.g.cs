@@ -3,7 +3,7 @@
 // specification or the generator, then run 'codegen generate'.
 // Contract: typesafe-v1, OpenAPI 3.1.0, API version 0.2.0
 // Spec SHA-256: 8b0cfc1cc772be7da4ef5a15254d9d40d9784af0d7f29a73265dd23379f4cddd
-// Generator: 3
+// Generator: 4
 
 #nullable enable
 
@@ -16,6 +16,7 @@ namespace Kkdev92.Jev.Wire;
 
 /// <summary>The <c>Answer</c> union, told apart by <c>type</c>.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type", UnknownDerivedTypeHandling = JsonUnknownDerivedTypeHandling.FailSerialization)]
+[JsonDerivedType(typeof(BoxAnswer), "box")]
 [JsonDerivedType(typeof(ChoiceAnswer), "choice")]
 [JsonDerivedType(typeof(NoulAnswer), "noul")]
 [JsonDerivedType(typeof(ScoreAnswer), "score")]

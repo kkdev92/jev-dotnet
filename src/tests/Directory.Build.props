@@ -6,8 +6,9 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <!-- Test assemblies are not part of the public surface, and test framework types are not documented. -->
-    <NoWarn>$(NoWarn);CA1707;CA2007</NoWarn>
+    <!-- Test assemblies are not part of the public surface, and test framework types are not documented.
+         JEV001: the tests exercise the experimental image and box API. -->
+    <NoWarn>$(NoWarn);CA1707;CA2007;JEV001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(IsTestProject)' == 'true'">

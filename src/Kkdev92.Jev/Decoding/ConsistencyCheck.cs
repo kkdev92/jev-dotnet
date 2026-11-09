@@ -7,9 +7,10 @@ namespace Kkdev92.Jev.Decoding;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The contract describes three relationships: a distribution sums to approximately one, the chosen
-/// option is the one with the highest probability, and a score is the probability-weighted mean of
-/// its level indices. A response that breaks one is either rounded more coarsely than the tolerance
+/// The contract describes four relationships: a distribution sums to approximately one, the chosen
+/// option is the one with the highest probability, a score is the probability-weighted mean of its
+/// level indices, and a box's left edge is less than its right and its top less than its bottom.
+/// A response that breaks one is either rounded more coarsely than the tolerance
 /// or wrong, and the SDK cannot tell which — so by default it says so on the result and returns the
 /// values untouched. It never renormalises a distribution, re-derives a confidence, or replaces a
 /// score with the mean it computed.
@@ -36,6 +37,24 @@ internal static class ConsistencyCheck
         {
             if (question.Kind == QuestionKind.Noul)
             {
+                continue;
+            }
+
+            if (question.Kind == QuestionKind.Box)
+            {
+                var edges = decoded.Probabilities.AsSpan(question.ProbabilityOffset, BoxQuestionDefinition.EdgeCount);
+
+                // Positive when an edge is past the one it should be before. Edges that meet are
+                // within any tolerance, and are not reported.
+                var overlap = Math.Max(
+                    edges[BoxQuestionDefinition.Left] - edges[BoxQuestionDefinition.Right],
+                    edges[BoxQuestionDefinition.Top] - edges[BoxQuestionDefinition.Bottom]);
+
+                if (overlap > absolute + relative)
+                {
+                    (warnings ??= []).Add(new JevConsistencyWarning(question.Id, JevConsistencyCheck.BoxEdgeOrder, overlap));
+                }
+
                 continue;
             }
 

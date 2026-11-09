@@ -1,3 +1,10 @@
+[Experimental("JEV001")] readonly struct Kkdev92.Jev.BoxAnswer
+    System.Double Bottom { get; }
+    System.Double Left { get; }
+    System.Double Right { get; }
+    System.Double Top { get; }
+    System.Double? Confidence { get; }
+    override System.String ToString()
 readonly struct Kkdev92.Jev.ChoiceAnswer<T>
     System.Double Confidence { get; }
     System.Double GetProbability(System.Int32 index)
@@ -12,6 +19,15 @@ readonly struct Kkdev92.Jev.ChoiceAnswer<T>
     override System.String ToString()
 interface Kkdev92.Jev.IJevCredential
     System.Threading.Tasks.ValueTask<System.String> GetApiKeyAsync(System.Threading.CancellationToken cancellationToken)
+[Experimental("JEV001")] readonly struct Kkdev92.Jev.JevBoxHandle : System.IEquatable<Kkdev92.Jev.JevBoxHandle>
+    System.Boolean Equals(Kkdev92.Jev.JevBoxHandle other)
+    System.Boolean IsDefault { get; }
+    System.String Id { get; }
+    override System.Boolean Equals(System.Object? obj)
+    override System.Int32 GetHashCode()
+    override System.String ToString()
+    static System.Boolean op_Equality(Kkdev92.Jev.JevBoxHandle left, Kkdev92.Jev.JevBoxHandle right)
+    static System.Boolean op_Inequality(Kkdev92.Jev.JevBoxHandle left, Kkdev92.Jev.JevBoxHandle right)
 readonly struct Kkdev92.Jev.JevChoiceHandle<T> : System.IEquatable<Kkdev92.Jev.JevChoiceHandle<T>>
     System.Boolean Equals(Kkdev92.Jev.JevChoiceHandle<T> other)
     System.Boolean IsDefault { get; }
@@ -35,6 +51,9 @@ sealed class Kkdev92.Jev.JevClient
     System.Threading.Tasks.Task<Kkdev92.Jev.JevResult> EvaluateAsync<TState>(TState state, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TState> stateTypeInfo, Kkdev92.Jev.JevDecisionPlan plan, Kkdev92.Jev.JevRequestOptions? options = null, System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<Kkdev92.Jev.JevResult> EvaluateContentAsync(Kkdev92.Jev.JevContent state, Kkdev92.Jev.JevDecisionPlan plan, Kkdev92.Jev.JevRequestOptions? options = null, System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Kkdev92.Jev.JevModel>> GetModelsAsync(Kkdev92.Jev.JevRequestOptions? options = null, System.Threading.CancellationToken cancellationToken = default)
+    [Experimental("JEV001")] System.Threading.Tasks.Task<Kkdev92.Jev.JevResult> EvaluateAsync(System.String state, System.Collections.Generic.IReadOnlyList<Kkdev92.Jev.JevImage> images, Kkdev92.Jev.JevDecisionPlan plan, Kkdev92.Jev.JevRequestOptions? options = null, System.Threading.CancellationToken cancellationToken = default)
+    [Experimental("JEV001")] System.Threading.Tasks.Task<Kkdev92.Jev.JevResult> EvaluateAsync<TState>(TState state, System.Text.Json.Serialization.Metadata.JsonTypeInfo<TState> stateTypeInfo, System.Collections.Generic.IReadOnlyList<Kkdev92.Jev.JevImage> images, Kkdev92.Jev.JevDecisionPlan plan, Kkdev92.Jev.JevRequestOptions? options = null, System.Threading.CancellationToken cancellationToken = default)
+    [Experimental("JEV001")] System.Threading.Tasks.Task<Kkdev92.Jev.JevResult> EvaluateContentAsync(Kkdev92.Jev.JevContent state, System.Collections.Generic.IReadOnlyList<Kkdev92.Jev.JevImage> images, Kkdev92.Jev.JevDecisionPlan plan, Kkdev92.Jev.JevRequestOptions? options = null, System.Threading.CancellationToken cancellationToken = default)
 sealed class Kkdev92.Jev.JevClientOptions
     .ctor()
     Kkdev92.Jev.IJevCredential? Credential { get; set; }
@@ -64,6 +83,7 @@ enum Kkdev92.Jev.JevConsistencyCheck : System.Int32
     ChoiceIsMostProbable = 2
     ProbabilitySum = 1
     ScoreIsExpectation = 3
+    [Experimental("JEV001")] BoxEdgeOrder = 4
 readonly struct Kkdev92.Jev.JevConsistencyWarning : System.IEquatable<Kkdev92.Jev.JevConsistencyWarning>
     .ctor(System.String QuestionId, Kkdev92.Jev.JevConsistencyCheck Check, System.Double Deviation)
     Kkdev92.Jev.JevConsistencyCheck Check { get; init; }
@@ -113,6 +133,8 @@ sealed class Kkdev92.Jev.JevDecisionPlanBuilder
     Kkdev92.Jev.JevNoulHandle AddNoul(System.String id, Kkdev92.Jev.JevContent instructions, Kkdev92.Jev.JevNoulCriteria criteria = default)
     Kkdev92.Jev.JevScoreHandle AddScore(System.String id, Kkdev92.Jev.JevContent instructions, System.ReadOnlySpan<Kkdev92.Jev.JevContent> levels)
     System.Int32 Count { get; }
+    [Experimental("JEV001")] Kkdev92.Jev.JevBoxHandle AddBox(System.String id, Kkdev92.Jev.JevContent instructions)
+    [Experimental("JEV001")] System.Void AddImage(Kkdev92.Jev.JevImage image)
     const System.Int32 MaxChoiceOptions = 255
     const System.Int32 MaxEncodedQuestionsBytes = 1048576
     const System.Int32 MaxQuestions = 1024
@@ -134,6 +156,15 @@ sealed class Kkdev92.Jev.JevHttpException : Kkdev92.Jev.JevException, System.Run
     System.String? ErrorType { get; }
     System.String? RequestId { get; }
     System.TimeSpan? RetryAfter { get; }
+[Experimental("JEV001")] sealed class Kkdev92.Jev.JevImage
+    Kkdev92.Jev.JevImageFormat Format { get; }
+    System.Int32 Length { get; }
+    System.String Reference { get; }
+    override System.String ToString()
+    static Kkdev92.Jev.JevImage FromBytes(System.ReadOnlySpan<System.Byte> data)
+[Experimental("JEV001")] enum Kkdev92.Jev.JevImageFormat : System.Int32
+    Jpeg = 2
+    Png = 1
 enum Kkdev92.Jev.JevLimit : System.Int32
     Queue = 3
     RequestBody = 1
@@ -218,6 +249,7 @@ sealed class Kkdev92.Jev.JevResult
     System.ReadOnlyMemory<System.Byte>? RawResponseBody { get; }
     System.String ActualModel { get; }
     System.String RequestedModel { get; }
+    [Experimental("JEV001")] Kkdev92.Jev.BoxAnswer Get(Kkdev92.Jev.JevBoxHandle handle)
     override System.String ToString()
 readonly struct Kkdev92.Jev.JevResultMetadata
     System.Collections.Generic.IReadOnlyList<Kkdev92.Jev.JevConsistencyWarning> Warnings { get; }

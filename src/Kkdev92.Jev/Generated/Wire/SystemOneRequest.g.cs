@@ -3,7 +3,7 @@
 // specification or the generator, then run 'codegen generate'.
 // Contract: typesafe-v1, OpenAPI 3.1.0, API version 0.2.0
 // Spec SHA-256: 8b0cfc1cc772be7da4ef5a15254d9d40d9784af0d7f29a73265dd23379f4cddd
-// Generator: 3
+// Generator: 4
 
 #nullable enable
 
@@ -17,6 +17,10 @@ namespace Kkdev92.Jev.Wire;
 /// <summary>The <c>SystemOneRequest</c> schema.</summary>
 internal sealed class SystemOneRequest
 {
+    [JsonPropertyName("assets")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, Asset>? Assets { get; set; }
+
     [JsonPropertyName("model")]
     [JsonRequired]
     public string Model { get; set; } = null!;
@@ -32,6 +36,14 @@ internal sealed class SystemOneRequest
     /// <summary>Checks what the serializer does not: value kinds, minimum counts, finite numbers, null entries.</summary>
     internal void Validate(WireValidation validation, string path)
     {
+        if (Assets is { } m0)
+        {
+            validation.MinCount(m0.Count, 1, WireValidation.Member(path, "assets"));
+            foreach (var e0 in m0)
+            {
+                if (e0.Value is null) validation.Null(WireValidation.Key(WireValidation.Member(path, "assets"), e0.Key)); else e0.Value.Validate(validation, WireValidation.Key(WireValidation.Member(path, "assets"), e0.Key));
+            }
+        }
         validation.MinCount(Questions.Count, 1, WireValidation.Member(path, "questions"));
         foreach (var e0 in Questions)
         {

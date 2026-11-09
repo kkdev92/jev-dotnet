@@ -190,7 +190,7 @@ public sealed class PublicApiTests
         PropertyInfo property => Attributes(property) + DescribeProperty(property, nullability),
 
         FieldInfo { IsLiteral: true, DeclaringType.IsEnum: true } field =>
-            $"{field.Name} = {Convert.ToString(field.GetRawConstantValue(), CultureInfo.InvariantCulture)}",
+            Attributes(field) + $"{field.Name} = {Convert.ToString(field.GetRawConstantValue(), CultureInfo.InvariantCulture)}",
 
         FieldInfo field => Attributes(field) + (field.IsLiteral
             ? $"const {TypeName(field.FieldType, nullability.Create(field))} {field.Name} = {Literal(field.GetRawConstantValue())}"
