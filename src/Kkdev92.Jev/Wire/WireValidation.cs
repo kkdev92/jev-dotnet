@@ -68,6 +68,20 @@ internal sealed class WireValidation
         }
     }
 
+    /// <summary>A string the contract restricts to a list of values: an enum, or a constant outside a union.</summary>
+    public void OneOf(string value, ReadOnlySpan<string> allowed, string path)
+    {
+        foreach (var candidate in allowed)
+        {
+            if (string.Equals(value, candidate, StringComparison.Ordinal))
+            {
+                return;
+            }
+        }
+
+        Add(path, WireRule.NotListed);
+    }
+
     public void MinCount(int count, int minimum, string path)
     {
         if (count < minimum)
@@ -111,4 +125,5 @@ internal enum WireRule
     NotFinite,
     TooFew,
     Null,
+    NotListed,
 }

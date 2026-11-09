@@ -184,6 +184,10 @@ internal static class SystemOneResponseReader
                 case ScoreQuestionDefinition score:
                     slots[slot] = ReadScore(ref reader, body, score, probabilities, scratch, out legends![slot], tolerance);
                     break;
+
+                case BoxQuestionDefinition box:
+                    slots[slot] = ReadBox(ref reader, box, probabilities, scratch, tolerance);
+                    break;
             }
         }
     }
@@ -224,6 +228,7 @@ internal static class SystemOneResponseReader
             found = copy.ValueTextEquals("noul"u8) ? QuestionKind.Noul
                 : copy.ValueTextEquals("choice"u8) ? QuestionKind.Choice
                 : copy.ValueTextEquals("score"u8) ? QuestionKind.Score
+                : copy.ValueTextEquals("box"u8) ? QuestionKind.Box
                 : 0;
         }
 
@@ -390,6 +395,81 @@ internal static class SystemOneResponseReader
         if (count != question.Levels.Length)
         {
             throw Error(JevProtocolError.MissingProbability);
+        }
+    }
+
+    private static AnswerSlot ReadBox(ref Utf8JsonReader reader, BoxQuestionDefinition question, double[] numbers, scoped Span<char> scratch, double tolerance)
+    {
+        var slot = new AnswerSlot { Value = double.NaN, Selected = -1 };
+        bool sawBox = false, sawConfidence = false;
+
+        while (Next(ref reader) != JsonTokenType.EndObject)
+        {
+            if (reader.ValueTextEquals("box"u8))
+            {
+                Once(ref sawBox);
+                Expect(Next(ref reader), JsonTokenType.StartObject);
+                ReadEdges(ref reader, numbers, question.ProbabilityOffset, scratch, tolerance);
+            }
+            else if (reader.ValueTextEquals("confidence"u8))
+            {
+                Once(ref sawConfidence);
+
+                // The API description lets it be null, though the documentation describes a number
+                // from 0 to 1. Null is kept as NaN, as a noul's missing confidence is.
+                slot.Confidence = Next(ref reader) == JsonTokenType.Null ? double.NaN : ReadNumber(ref reader, 1, tolerance);
+            }
+            else
+            {
+                SkipUnknown(ref reader, scratch);
+            }
+        }
+
+        return sawBox && sawConfidence ? slot : throw Error(JevProtocolError.MissingField);
+    }
+
+    /// <summary>The four edges of a box, each a fraction of the image from 0 to 1, each given exactly once.</summary>
+    private static void ReadEdges(ref Utf8JsonReader reader, double[] numbers, int offset, scoped Span<char> scratch, double tolerance)
+    {
+        bool sawTop = false, sawBottom = false, sawLeft = false, sawRight = false;
+
+        while (Next(ref reader) != JsonTokenType.EndObject)
+        {
+            int edge;
+
+            if (reader.ValueTextEquals("top"u8))
+            {
+                Once(ref sawTop);
+                edge = BoxQuestionDefinition.Top;
+            }
+            else if (reader.ValueTextEquals("bottom"u8))
+            {
+                Once(ref sawBottom);
+                edge = BoxQuestionDefinition.Bottom;
+            }
+            else if (reader.ValueTextEquals("left"u8))
+            {
+                Once(ref sawLeft);
+                edge = BoxQuestionDefinition.Left;
+            }
+            else if (reader.ValueTextEquals("right"u8))
+            {
+                Once(ref sawRight);
+                edge = BoxQuestionDefinition.Right;
+            }
+            else
+            {
+                SkipUnknown(ref reader, scratch);
+                continue;
+            }
+
+            Next(ref reader);
+            numbers[offset + edge] = ReadNumber(ref reader, 1, tolerance);
+        }
+
+        if (!(sawTop && sawBottom && sawLeft && sawRight))
+        {
+            throw Error(JevProtocolError.MissingField);
         }
     }
 

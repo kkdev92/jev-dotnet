@@ -17,16 +17,8 @@ public sealed class FailClosedTests
         { "a maximum where nothing pins one", d => d.Property("SystemOneRequest", "questions")["maxProperties"] = 1024 },
         { "x-accepts that disagrees with the anyOf beside it", d => d.Property("NoulQuestion", "instructions")["x-accepts"] = "string" },
         { "x-accepts with no anyOf beside it", d => d.Property("Usage", "input_tokens")["x-accepts"] = "integer" },
-        { "an omitted header that became required", d => Parameters(d)[0]!["required"] = true },
-        {
-            "an omitted header that moved", d =>
-            {
-                var first = Parameters(d)[0]!;
-                Parameters(d).RemoveAt(0);
-                Parameters(d).Add(first);
-            }
-        },
-        { "a header beside the omitted ones", d => Parameters(d).Add(new JsonObject { ["in"] = "header", ["name"] = "TypeSafe-Something-Else", ["schema"] = new JsonObject { ["type"] = "string" } }) },
+        { "the images header, become required", d => Parameters(d)[0]!["required"] = true },
+        { "a header nobody classified", d => Parameters(d).Add(new JsonObject { ["in"] = "header", ["name"] = "TypeSafe-Something-Else", ["schema"] = new JsonObject { ["type"] = "string" } }) },
         { "an approved header that became required", d => Parameters(d)[1]!["required"] = true },
         { "an approved header that takes any string", d => Parameters(d)[1]!["schema"] = new JsonObject { ["type"] = "string" } },
         { "an approved header with a second value", d => Parameters(d)[1]!["schema"]!["enum"]!.AsArray().Add("false") },
@@ -34,9 +26,27 @@ public sealed class FailClosedTests
         { "a switch header nobody classified", d => Parameters(d).Add(new JsonObject { ["in"] = "header", ["name"] = "TypeSafe-Danger-Zone-Other", ["schema"] = new JsonObject { ["enum"] = new JsonArray("true"), ["type"] = "string" } }) },
         { "a header declared twice in different case", d => Parameters(d).Add(new JsonObject { ["in"] = "header", ["name"] = "typesafe-danger-zone-long-context", ["schema"] = new JsonObject { ["enum"] = new JsonArray("true"), ["type"] = "string" } }) },
         { "a header name that is not a token", d => Parameters(d)[1]!["name"] = "Long Context" },
-        { "an omitted schema the document no longer has", d => d["components"]!["schemas"]!.AsObject().Remove("BoxCoordinates") },
+        { "a reference to a schema the document does not have", d => d["components"]!["schemas"]!.AsObject().Remove("BoxCoordinates") },
         { "a string format", d => d.Property("ModelMetadata", "release_date")["format"] = "date" },
-        { "an enum", d => d.Property("ModelMetadata", "name")["enum"] = new JsonArray("jev-latest") },
+        { "an enum of numbers", d => d.Property("NoulAnswer", "noul")["enum"] = new JsonArray(0, 1) },
+        { "an enum of strings with no type", d => d.Property("Asset", "format").Remove("type") },
+        { "an enum that lists a value twice", d => d.Property("Asset", "format")["enum"] = new JsonArray("png", "png") },
+        { "an empty enum", d => d.Property("Asset", "format")["enum"] = new JsonArray() },
+        { "an enum with a bound beside it", d => d.Property("Asset", "format")["maxLength"] = 4 },
+        { "an enum inside a list", d => d.Property("ValidationError", "loc")["items"] = new JsonObject { ["enum"] = new JsonArray("body"), ["type"] = "string" } },
+        { "a required constant outside a union", d => d.Schema("Asset")["required"] = new JsonArray("type") },
+        { "a form whose JSON is another schema", d => Form(d)["schema"]!["properties"]!["request"]!["contentSchema"]!["$ref"] = "#/components/schemas/Usage" },
+        { "a form whose first part is not JSON", d => Form(d)["schema"]!["properties"]!["request"]!["contentMediaType"] = "text/plain" },
+        { "a form with a second named part", d => Form(d)["schema"]!["properties"]!["metadata"] = new JsonObject { ["type"] = "string" } },
+        { "a form that does not require its JSON", d => Form(d)["schema"]!.AsObject().Remove("required") },
+        { "a form whose files are not images", d => Form(d)["schema"]!["additionalProperties"]!["contentMediaType"] = "application/pdf" },
+        { "a form whose files are not strings", d => Form(d)["schema"]!["additionalProperties"]!["type"] = "object" },
+        { "a form with no files", d => Form(d)["schema"]!.AsObject().Remove("additionalProperties") },
+        { "a form with no encoding", d => Form(d).Remove("encoding") },
+        { "a form whose encoding names another part", d => Form(d)["encoding"] = new JsonObject { ["metadata"] = new JsonObject { ["contentType"] = "application/json" } } },
+        { "a form encoded as something other than JSON", d => Form(d)["encoding"]!["request"]!["contentType"] = "text/plain" },
+        { "a request body in another media type", d => d["paths"]!["/v1/systemone"]!["post"]!["requestBody"]!["content"]!["application/x-www-form-urlencoded"] = new JsonObject { ["schema"] = new JsonObject { ["type"] = "object" } } },
+        { "a form with no JSON beside it", d => d["paths"]!["/v1/systemone"]!["post"]!["requestBody"]!["content"]!.AsObject().Remove("application/json") },
         { "a numeric bound", d => d.Property("NoulAnswer", "noul")["maximum"] = 1 },
         { "allOf", d => d.Schema("Usage")["allOf"] = new JsonArray() },
         { "an external reference", d => d.Property("SystemOneResponse", "usage")["$ref"] = "https://example.com/usage.json" },
@@ -58,8 +68,11 @@ public sealed class FailClosedTests
         { "a server with variables", d => d["servers"] = new JsonArray(new JsonObject { ["url"] = "https://api.typesafe.ai", ["variables"] = new JsonObject() }) },
     };
 
-    /// <summary>The parameters of <c>POST /v1/systemone</c>: the omitted images header, then the approved long-context one.</summary>
+    /// <summary>The parameters of <c>POST /v1/systemone</c>: the images header, then the long-context one, both approved.</summary>
     private static JsonArray Parameters(JsonObject document) => document["paths"]!["/v1/systemone"]!["post"]!["parameters"]!.AsArray();
+
+    /// <summary>The <c>multipart/form-data</c> form of <c>POST /v1/systemone</c>, which carries images.</summary>
+    private static JsonObject Form(JsonObject document) => document["paths"]!["/v1/systemone"]!["post"]!["requestBody"]!["content"]!["multipart/form-data"]!.AsObject();
 
     [Theory]
     [MemberData(nameof(Unsupported))]

@@ -14,9 +14,10 @@ namespace Kkdev92.Jev.CodeGen.OpenApi;
 /// <para>
 /// This is not a general OpenAPI generator and does not try to be one. It understands the
 /// keywords the TypeSafe document uses today — objects with properties, maps, arrays,
-/// <c>anyOf</c> over value kinds, a nullable reference, a discriminated <c>oneOf</c>,
-/// <c>minItems</c> and <c>minProperties</c>, optional headers that take one fixed value, the one
-/// server the runtime sends to — and fails closed on everything else.
+/// <c>anyOf</c> over value kinds, a nullable reference, a discriminated <c>oneOf</c>, a string
+/// <c>enum</c>, an optional constant, <c>minItems</c> and <c>minProperties</c>, optional headers
+/// that take one fixed value, the <c>multipart/form-data</c> form the runtime sends images in, the
+/// one server the runtime sends to — and fails closed on everything else.
 /// </para>
 /// <para>
 /// Failing closed is the point. If a snapshot adds <c>maxItems: 10</c> to the score criteria, the
@@ -68,6 +69,7 @@ internal static class OpenApiParser
         var securitySchemes = ParseSecuritySchemes(components);
         var operations = ParseOperations(root.GetProperty("paths"), securitySchemes);
         var schemas = ParseSchemas(components.GetProperty("schemas"), snapshot.NamingOverrides, PinnedMaxima(snapshot.Semantics));
+        ExpectReferencesResolve(operations, schemas);
 
         return new ApiContract(
             snapshot.Contract,
@@ -274,12 +276,13 @@ internal static class OpenApiParser
                     : [];
 
                 string? requestSchema = null;
+                FormDef? form = null;
                 var requestRequired = false;
 
                 if (operation.TryGetProperty("requestBody", out var requestBody))
                 {
                     Expect(requestBody, location + "/requestBody", allowed: ["content", "required", "description"]);
-                    requestSchema = JsonContentSchema(requestBody, location + "/requestBody");
+                    (requestSchema, form) = RequestContent(requestBody, location + "/requestBody");
                     requestRequired = requestBody.TryGetProperty("required", out var required) && required.GetBoolean();
                 }
 
@@ -325,7 +328,8 @@ internal static class OpenApiParser
                     requestRequired,
                     headers,
                     responses,
-                    security));
+                    security,
+                    form));
             }
         }
 
@@ -418,13 +422,147 @@ internal static class OpenApiParser
             throw Unsupported(location + "/content", $"media types [{string.Join(", ", mediaTypes)}]. Only application/json is interpreted.");
         }
 
-        var media = content.GetProperty("application/json");
+        return JsonMediaSchema(content.GetProperty("application/json"), location);
+    }
+
+    /// <summary>
+    /// A request body: an <c>application/json</c> body, and optionally the same body sent as a
+    /// <c>multipart/form-data</c> form with files beside it.
+    /// </summary>
+    private static (string Schema, FormDef? Form) RequestContent(JsonElement requestBody, string location)
+    {
+        var content = requestBody.GetProperty("content");
+        var mediaTypes = content.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal).ToList();
+
+        if (mediaTypes is not (["application/json"] or ["application/json", "multipart/form-data"]))
+        {
+            throw Unsupported(location + "/content", $"media types [{string.Join(", ", mediaTypes)}]. Only application/json is interpreted, alone or beside a multipart/form-data form of the same body.");
+        }
+
+        var schema = JsonMediaSchema(content.GetProperty("application/json"), location);
+
+        return content.TryGetProperty("multipart/form-data", out var form)
+            ? (schema, ParseForm(form, schema, location + "/content/multipart~1form-data"))
+            : (schema, null);
+    }
+
+    private static string JsonMediaSchema(JsonElement media, string location)
+    {
         Expect(media, location + "/content/application~1json", allowed: ["schema"]);
 
-        var schema = media.GetProperty("schema");
+        if (!media.TryGetProperty("schema", out var schema))
+        {
+            throw Unsupported(location + "/content/application~1json", "a JSON body without a schema.");
+        }
+
         Expect(schema, location + "/content/application~1json/schema", allowed: ["$ref"]);
 
         return SchemaName(String(schema, "$ref", location), location);
+    }
+
+    /// <summary>
+    /// A <c>multipart/form-data</c> form, in the one shape this generator reads: the JSON body in a
+    /// part of its own, encoded as <c>application/json</c> and holding the schema of the
+    /// <c>application/json</c> request, and files of one media type in every other part.
+    /// </summary>
+    /// <remarks>
+    /// The runtime sends a form only to carry images, writing the JSON part under the name read
+    /// here and each image as a file part typed <c>image/png</c> or <c>image/jpeg</c>. A form with
+    /// another named part, a JSON part of another schema, or files of another media type would
+    /// need the runtime to send something it does not, so each stops generation.
+    /// </remarks>
+    private static FormDef ParseForm(JsonElement media, string jsonSchema, string location)
+    {
+        Expect(media, location, allowed: ["schema", "encoding"]);
+
+        if (!media.TryGetProperty("schema", out var schema))
+        {
+            throw Unsupported(location, "a form without a schema.");
+        }
+
+        var schemaLocation = location + "/schema";
+        Expect(schema, schemaLocation, allowed: ["type", "properties", "required", "additionalProperties"]);
+
+        if (String(schema, "type", schemaLocation) != "object" || !schema.TryGetProperty("properties", out var properties) || properties.ValueKind != JsonValueKind.Object)
+        {
+            throw Unsupported(schemaLocation, "a form that is not an object with properties.");
+        }
+
+        if (properties.EnumerateObject().ToList() is not [var part])
+        {
+            throw Unsupported(schemaLocation + "/properties", "a form with other than one named part. Only the JSON body is read as a named part.");
+        }
+
+        var partLocation = $"{schemaLocation}/properties/{Escape(part.Name)}";
+
+        if (!IsToken(part.Name))
+        {
+            throw Unsupported(partLocation, $"the part name '{Naming.Printable(part.Name)}', which is not a token.");
+        }
+
+        Expect(part.Value, partLocation, allowed: ["contentMediaType", "contentSchema"]);
+
+        if (String(part.Value, "contentMediaType", partLocation) != "application/json")
+        {
+            throw Unsupported(partLocation, "a named part that does not hold application/json.");
+        }
+
+        if (!part.Value.TryGetProperty("contentSchema", out var contentSchema))
+        {
+            throw Unsupported(partLocation, "a JSON part without a schema.");
+        }
+
+        Expect(contentSchema, partLocation + "/contentSchema", allowed: ["$ref"]);
+
+        if (SchemaName(String(contentSchema, "$ref", partLocation), partLocation) != jsonSchema)
+        {
+            throw Unsupported(partLocation, $"a JSON part whose schema is not {jsonSchema}, the schema of the application/json body.");
+        }
+
+        if (!schema.TryGetProperty("required", out var required)
+            || required.ValueKind != JsonValueKind.Array
+            || required.EnumerateArray().ToList() is not [{ ValueKind: JsonValueKind.String } only]
+            || only.GetString() != part.Name)
+        {
+            throw Unsupported(schemaLocation + "/required", $"a form that does not require its '{part.Name}' part and nothing else.");
+        }
+
+        if (!schema.TryGetProperty("additionalProperties", out var files))
+        {
+            throw Unsupported(schemaLocation, "a form without file parts.");
+        }
+
+        var filesLocation = schemaLocation + "/additionalProperties";
+        Expect(files, filesLocation, allowed: ["type", "contentMediaType"]);
+
+        var fileMediaType = String(files, "contentMediaType", filesLocation);
+
+        if (String(files, "type", filesLocation) != "string" || fileMediaType != "image/*")
+        {
+            throw Unsupported(filesLocation, $"file parts of '{Naming.Printable(fileMediaType)}'. The runtime sends image/png and image/jpeg parts, which only image/* admits here.");
+        }
+
+        if (!media.TryGetProperty("encoding", out var encoding))
+        {
+            throw Unsupported(location, $"a form that does not say how its '{part.Name}' part is encoded.");
+        }
+
+        var encodingLocation = location + "/encoding";
+        Expect(encoding, encodingLocation, allowed: [part.Name]);
+
+        if (!encoding.TryGetProperty(part.Name, out var partEncoding))
+        {
+            throw Unsupported(encodingLocation, $"a form that does not say how its '{part.Name}' part is encoded.");
+        }
+
+        Expect(partEncoding, $"{encodingLocation}/{Escape(part.Name)}", allowed: ["contentType"]);
+
+        if (String(partEncoding, "contentType", $"{encodingLocation}/{Escape(part.Name)}") != "application/json")
+        {
+            throw Unsupported($"{encodingLocation}/{Escape(part.Name)}", $"a '{part.Name}' part encoded as something other than application/json.");
+        }
+
+        return new FormDef(part.Name, fileMediaType);
     }
 
     private static List<SchemaDef> ParseSchemas(JsonElement schemas, NamingOverrides overrides, IReadOnlySet<string> pinnedMaxima)
@@ -481,6 +619,75 @@ internal static class OpenApiParser
 
         return result;
     }
+
+    /// <summary>
+    /// Every reference names a schema the document declares. One that does not — a schema renamed or
+    /// dropped while something still points at it — stops generation here, with where it was found,
+    /// rather than wherever the missing name is first looked up.
+    /// </summary>
+    private static void ExpectReferencesResolve(IReadOnlyList<OperationDef> operations, IReadOnlyList<SchemaDef> schemas)
+    {
+        var declared = schemas.Select(s => s.WireName).ToHashSet(StringComparer.Ordinal);
+
+        void Resolve(string name, string location)
+        {
+            if (!declared.Contains(name))
+            {
+                throw Unsupported(location, $"a reference to '{Naming.Printable(name)}', which the document does not declare.");
+            }
+        }
+
+        foreach (var operation in operations)
+        {
+            var location = $"#/paths/{Escape(operation.Key.Path)}/{operation.Key.Method.ToLowerInvariant()}";
+
+            if (operation.RequestSchema is { } request)
+            {
+                Resolve(request, location + "/requestBody");
+            }
+
+            foreach (var response in operation.Responses.Where(r => r.Schema is not null))
+            {
+                Resolve(response.Schema!, $"{location}/responses/{response.Status}");
+            }
+        }
+
+        foreach (var schema in schemas)
+        {
+            var location = $"#/components/schemas/{schema.WireName}";
+
+            switch (schema)
+            {
+                case UnionSchemaDef union:
+                    foreach (var member in union.Members)
+                    {
+                        Resolve(member.SchemaWireName, location + "/discriminator/mapping");
+                    }
+
+                    break;
+
+                case ObjectSchemaDef obj:
+                    foreach (var property in obj.Properties)
+                    {
+                        foreach (var reference in References(property.Type))
+                        {
+                            Resolve(reference, $"{location}/properties/{Escape(property.WireName)}");
+                        }
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    private static IEnumerable<string> References(TypeRef type) => type switch
+    {
+        SchemaRef s => [s.WireName],
+        NullableRef n => [n.Inner.WireName],
+        MapRef m => References(m.Value),
+        ArrayRef a => References(a.Items),
+        _ => [],
+    };
 
     private static UnionSchemaDef ParseUnion(string name, JsonElement schema, string csharpName)
     {
@@ -556,18 +763,22 @@ internal static class OpenApiParser
             }
         }
 
+        var constants = result.Where(p => p.Type is ConstRef).ToList();
+
         if (union is not null)
         {
-            var discriminatorProperty = result.FirstOrDefault(p => p.Type is ConstRef);
-
-            if (discriminatorProperty?.Type is not ConstRef constant || constant.Value != tag || !discriminatorProperty.Required)
+            // The discriminator is written and read by the serializer, not by a generated property,
+            // so it must be the member's only constant.
+            if (constants is not [{ Type: ConstRef constant, Required: true }] || constant.Value != tag)
             {
-                throw Unsupported(location, $"a member of '{union}' whose discriminator is not a required constant '{tag}'.");
+                throw Unsupported(location, $"a member of '{union}' whose only constant is not a required discriminator '{tag}'.");
             }
         }
-        else if (result.Any(p => p.Type is ConstRef))
+        else if (constants.FirstOrDefault(p => p.Required) is { } requiredConstant)
         {
-            throw Unsupported(location, "a constant property outside a discriminated union.");
+            // An optional one is absent or that value. A required one would be a discriminator
+            // without a union, which nothing here would write.
+            throw Unsupported(location, $"the required constant '{Naming.Printable(requiredConstant.WireName)}' outside a discriminated union.");
         }
 
         return new ObjectSchemaDef(name, csharpName, result, union, tag);
@@ -618,6 +829,32 @@ internal static class OpenApiParser
             return new ConstRef(String(schema, "const", location));
         }
 
+        if (keys.Contains("enum"))
+        {
+            Only(keys, location, "enum", "type");
+
+            if (String(schema, "type", location) != "string")
+            {
+                throw Unsupported(location, "an enum that is not of strings.");
+            }
+
+            var listed = schema.GetProperty("enum");
+
+            if (listed.ValueKind != JsonValueKind.Array || listed.GetArrayLength() == 0 || listed.EnumerateArray().Any(v => v.ValueKind != JsonValueKind.String))
+            {
+                throw Unsupported(location, "an enum that is not a non-empty list of strings.");
+            }
+
+            var values = listed.EnumerateArray().Select(v => v.GetString()!).ToList();
+
+            if (values.Distinct(StringComparer.Ordinal).Count() != values.Count)
+            {
+                throw Unsupported(location, "an enum that lists a value twice.");
+            }
+
+            return new EnumRef(values);
+        }
+
         switch (String(schema, "type", location))
         {
             case "string":
@@ -654,7 +891,8 @@ internal static class OpenApiParser
                         throw Unsupported(location + "/additionalProperties", $"additionalProperties of kind {additional.ValueKind}.");
                     }
 
-                    return new MapRef(ParseType(additional, location + "/additionalProperties", pinnedMaxima), OptionalCount(schema, "minProperties", location));
+                    var value = Element(ParseType(additional, location + "/additionalProperties", pinnedMaxima), location + "/additionalProperties");
+                    return new MapRef(value, OptionalCount(schema, "minProperties", location));
                 }
 
             case "array":
@@ -663,7 +901,7 @@ internal static class OpenApiParser
                     ExpectPinnedMaximum(keys, "maxItems", location, pinnedMaxima);
 
                     var items = schema.TryGetProperty("items", out var itemSchema)
-                        ? ParseType(itemSchema, location + "/items", pinnedMaxima)
+                        ? Element(ParseType(itemSchema, location + "/items", pinnedMaxima), location + "/items")
                         : new JsonValueRef(JsonKinds.Any);
 
                     return new ArrayRef(items, OptionalCount(schema, "minItems", location));
@@ -673,6 +911,15 @@ internal static class OpenApiParser
                 throw Unsupported(location, $"type '{String(schema, "type", location)}'.");
         }
     }
+
+    /// <summary>
+    /// The element of a list or a map. An enum or a constant is read as a property's own type only:
+    /// nothing in the contract has one as an element, and the generated code would have no check for it.
+    /// </summary>
+    private static TypeRef Element(TypeRef element, string location)
+        => element is EnumRef or ConstRef
+            ? throw Unsupported(location, "an enum or a constant as the element of a list or a map.")
+            : element;
 
     /// <summary>
     /// An <c>anyOf</c> is either a set of value kinds or a nullable reference. Nothing else is interpreted.

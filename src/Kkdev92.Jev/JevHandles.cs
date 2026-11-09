@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+using Kkdev92.Jev.Internal;
 using Kkdev92.Jev.Planning;
 
 namespace Kkdev92.Jev;
@@ -120,4 +122,38 @@ public readonly struct JevNoulHandle : IEquatable<JevNoulHandle>
 
     /// <summary>Whether two handles differ.</summary>
     public static bool operator !=(JevNoulHandle left, JevNoulHandle right) => !left.Equals(right);
+}
+
+/// <summary>Identifies a box question in one plan.</summary>
+/// <remarks>See <see cref="JevChoiceHandle{T}"/>: the same ownership rules apply.</remarks>
+[Experimental(Experiments.Images)]
+public readonly struct JevBoxHandle : IEquatable<JevBoxHandle>
+{
+    internal JevBoxHandle(BoxQuestionDefinition definition) => Definition = definition;
+
+    internal BoxQuestionDefinition? Definition { get; }
+
+    /// <summary>True for <c>default</c>, which identifies no question.</summary>
+    public bool IsDefault => Definition is null;
+
+    /// <summary>The question id, or an empty string for a default handle.</summary>
+    public string Id => Definition?.Id ?? string.Empty;
+
+    /// <inheritdoc />
+    public bool Equals(JevBoxHandle other) => ReferenceEquals(Definition, other.Definition);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is JevBoxHandle other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => Definition is null ? 0 : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Definition);
+
+    /// <summary>The kind and id of the question.</summary>
+    public override string ToString() => IsDefault ? "JevBoxHandle (default)" : $"JevBoxHandle ({Id})";
+
+    /// <summary>Whether two handles identify the same question of the same plan.</summary>
+    public static bool operator ==(JevBoxHandle left, JevBoxHandle right) => left.Equals(right);
+
+    /// <summary>Whether two handles differ.</summary>
+    public static bool operator !=(JevBoxHandle left, JevBoxHandle right) => !left.Equals(right);
 }

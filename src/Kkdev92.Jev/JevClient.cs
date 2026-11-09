@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text.Json.Serialization.Metadata;
 using System.Text.Unicode;
@@ -85,8 +86,50 @@ public sealed class JevClient
         ArgumentNullException.ThrowIfNull(plan);
         TextRules.ThrowIfMalformed(state, nameof(state), "state");
 
+        var content = JevContent.FromText(state);
+        var callImages = CheckImages(null, plan, content);
         var call = CallSettings.Resolve(_settings, options);
-        return EvaluateCoreAsync(StateSource.FromContent(JevContent.FromText(state)), plan, call, cancellationToken);
+        return EvaluateCoreAsync(StateSource.FromContent(content), plan, callImages, call, cancellationToken);
+    }
+
+    /// <summary>Evaluates text that shows images against a plan.</summary>
+    /// <param name="state">The text to evaluate, sent as a JSON string, with the reference of every image in <paramref name="images"/> where it belongs.</param>
+    /// <param name="images">
+    /// The images the state shows. Each must appear in the state by its reference; one the plan
+    /// already has is sent once, and so is one listed twice.
+    /// </param>
+    /// <param name="plan">The questions to ask.</param>
+    /// <param name="options">Overrides for this call.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>An answer to every question of the plan.</returns>
+    /// <remarks>
+    /// Write each image's <see cref="JevImage.Reference"/> where the image belongs in the state. The
+    /// request is sent as a form, with the plan's images (see
+    /// <see cref="JevDecisionPlanBuilder.AddImage"/>) and these after them, and with the header
+    /// TypeSafe asks for with images. Images count towards <see cref="JevClientOptions.MaxRequestBodyBytes"/>,
+    /// which applies to the whole form. Experimental, as TypeSafe's images are.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>. Thrown before the call starts.</exception>
+    /// <exception cref="ArgumentException">
+    /// The state, an image or an option is invalid: an entry of <paramref name="images"/> is null or
+    /// absent from the state, the state references an image the request does not send, or the plan
+    /// asks a box question with no image to look at. Thrown before the call starts.
+    /// </exception>
+    /// <exception cref="JevException">Returned through the task: the call failed. See the derived types.</exception>
+    /// <exception cref="JevTimeoutException">Returned through the task: the call's deadline passed.</exception>
+    /// <exception cref="OperationCanceledException">Returned through the task: <paramref name="cancellationToken"/> was cancelled.</exception>
+    [Experimental(Experiments.Images)]
+    public Task<JevResult> EvaluateAsync(string state, IReadOnlyList<JevImage> images, JevDecisionPlan plan, JevRequestOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(images);
+        ArgumentNullException.ThrowIfNull(plan);
+        TextRules.ThrowIfMalformed(state, nameof(state), "state");
+
+        var content = JevContent.FromText(state);
+        var callImages = CheckImages(images, plan, content);
+        var call = CallSettings.Resolve(_settings, options);
+        return EvaluateCoreAsync(StateSource.FromContent(content), plan, callImages, call, cancellationToken);
     }
 
     /// <summary>Evaluates a typed state, serialized with metadata you supply, against a plan.</summary>
@@ -116,8 +159,58 @@ public sealed class JevClient
         ArgumentNullException.ThrowIfNull(stateTypeInfo);
         ArgumentNullException.ThrowIfNull(plan);
 
+        var callImages = CheckImages(null, plan, state: null);
         var call = CallSettings.Resolve(_settings, options);
-        return EvaluateCoreAsync(StateSource.FromTyped(state, stateTypeInfo), plan, call, cancellationToken);
+        return EvaluateCoreAsync(StateSource.FromTyped(state, stateTypeInfo), plan, callImages, call, cancellationToken);
+    }
+
+    /// <summary>Evaluates a typed state that shows images, serialized with metadata you supply, against a plan.</summary>
+    /// <typeparam name="TState">The state's type.</typeparam>
+    /// <param name="state">
+    /// The state, with the reference of every image in <paramref name="images"/> in a string value
+    /// where the image belongs. Serialized once per call, before the first attempt.
+    /// </param>
+    /// <param name="stateTypeInfo">Source-generated metadata for <typeparamref name="TState"/>. See the overload without images.</param>
+    /// <param name="images">
+    /// The images the state shows. Each must appear in the serialized state by its reference; one the
+    /// plan already has is sent once, and so is one listed twice.
+    /// </param>
+    /// <param name="plan">The questions to ask.</param>
+    /// <param name="options">Overrides for this call.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>An answer to every question of the plan.</returns>
+    /// <remarks>
+    /// Write each image's <see cref="JevImage.Reference"/> where the image belongs in the state. The
+    /// request is sent as a form, with the plan's images (see
+    /// <see cref="JevDecisionPlanBuilder.AddImage"/>) and these after them, and with the header
+    /// TypeSafe asks for with images. Images count towards <see cref="JevClientOptions.MaxRequestBodyBytes"/>,
+    /// which applies to the whole form. Experimental, as TypeSafe's images are.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>. Thrown before the call starts.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown before the call starts: an option is invalid, an entry of <paramref name="images"/> is
+    /// null, or the plan asks a box question with no image to look at. Returned through the task,
+    /// once the state is serialized: it is a number, boolean or null, an image is absent from it, or
+    /// it references an image the request does not send.
+    /// </exception>
+    /// <exception cref="JevException">Returned through the task: the call failed.</exception>
+    /// <exception cref="JevTimeoutException">Returned through the task: the call's deadline passed.</exception>
+    /// <exception cref="OperationCanceledException">Returned through the task: <paramref name="cancellationToken"/> was cancelled.</exception>
+    [Experimental(Experiments.Images)]
+    public Task<JevResult> EvaluateAsync<TState>(TState state, JsonTypeInfo<TState> stateTypeInfo, IReadOnlyList<JevImage> images, JevDecisionPlan plan, JevRequestOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        if (state is null)
+        {
+            throw new ArgumentNullException(nameof(state), "The state must not be null: the API does not accept a null state.");
+        }
+
+        ArgumentNullException.ThrowIfNull(stateTypeInfo);
+        ArgumentNullException.ThrowIfNull(images);
+        ArgumentNullException.ThrowIfNull(plan);
+
+        var callImages = CheckImages(images, plan, state: null);
+        var call = CallSettings.Resolve(_settings, options);
+        return EvaluateCoreAsync(StateSource.FromTyped(state, stateTypeInfo), plan, callImages, call, cancellationToken);
     }
 
     /// <summary>Evaluates prepared content — text, or a JSON object or array — against a plan.</summary>
@@ -137,19 +230,52 @@ public sealed class JevClient
     public Task<JevResult> EvaluateContentAsync(JevContent state, JevDecisionPlan plan, JevRequestOptions? options = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(plan);
+        ThrowIfNotSendable(state);
 
-        if (state.Kind is JevContentKind.Unspecified or JevContentKind.Null)
-        {
-            throw new ArgumentException("The state must be text, an object or an array. The API does not accept a missing or null state.", nameof(state));
-        }
-
-        if (!state.IsWellFormed)
-        {
-            throw new ArgumentException("The state contains a lone surrogate, which has no UTF-8 encoding and would be replaced in transit.", nameof(state));
-        }
-
+        var callImages = CheckImages(null, plan, state);
         var call = CallSettings.Resolve(_settings, options);
-        return EvaluateCoreAsync(StateSource.FromContent(state), plan, call, cancellationToken);
+        return EvaluateCoreAsync(StateSource.FromContent(state), plan, callImages, call, cancellationToken);
+    }
+
+    /// <summary>Evaluates prepared content that shows images — text, or a JSON object or array — against a plan.</summary>
+    /// <param name="state">
+    /// The state, with the reference of every image in <paramref name="images"/> in a string value
+    /// where the image belongs. See the overload without images.
+    /// </param>
+    /// <param name="images">
+    /// The images the state shows. Each must appear in the state by its reference; one the plan
+    /// already has is sent once, and so is one listed twice.
+    /// </param>
+    /// <param name="plan">The questions to ask.</param>
+    /// <param name="options">Overrides for this call.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>An answer to every question of the plan.</returns>
+    /// <remarks>
+    /// Write each image's <see cref="JevImage.Reference"/> where the image belongs in the state. The
+    /// request is sent as a form, with the plan's images (see
+    /// <see cref="JevDecisionPlanBuilder.AddImage"/>) and these after them, and with the header
+    /// TypeSafe asks for with images. Images count towards <see cref="JevClientOptions.MaxRequestBodyBytes"/>,
+    /// which applies to the whole form. Experimental, as TypeSafe's images are.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="images"/> or <paramref name="plan"/> is <see langword="null"/>. Thrown before the call starts.</exception>
+    /// <exception cref="ArgumentException">
+    /// The state is unspecified or null, an entry of <paramref name="images"/> is null or absent from
+    /// the state, the state references an image the request does not send, the plan asks a box
+    /// question with no image to look at, or an option is invalid. Thrown before the call starts.
+    /// </exception>
+    /// <exception cref="JevException">Returned through the task: the call failed.</exception>
+    /// <exception cref="JevTimeoutException">Returned through the task: the call's deadline passed.</exception>
+    /// <exception cref="OperationCanceledException">Returned through the task: <paramref name="cancellationToken"/> was cancelled.</exception>
+    [Experimental(Experiments.Images)]
+    public Task<JevResult> EvaluateContentAsync(JevContent state, IReadOnlyList<JevImage> images, JevDecisionPlan plan, JevRequestOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(images);
+        ArgumentNullException.ThrowIfNull(plan);
+        ThrowIfNotSendable(state);
+
+        var callImages = CheckImages(images, plan, state);
+        var call = CallSettings.Resolve(_settings, options);
+        return EvaluateCoreAsync(StateSource.FromContent(state), plan, callImages, call, cancellationToken);
     }
 
     /// <summary>Lists the models and aliases the key can use.</summary>
@@ -170,7 +296,43 @@ public sealed class JevClient
         return GetModelsCoreAsync(call, cancellationToken);
     }
 
-    private async Task<JevResult> EvaluateCoreAsync(StateSource state, JevDecisionPlan plan, CallSettings call, CancellationToken cancellationToken)
+    /// <summary>Refuses content the API cannot take as a state.</summary>
+    /// <exception cref="ArgumentException">The state is unspecified or null, or contains a lone surrogate.</exception>
+    private static void ThrowIfNotSendable(JevContent state)
+    {
+        if (state.Kind is JevContentKind.Unspecified or JevContentKind.Null)
+        {
+            throw new ArgumentException("The state must be text, an object or an array. The API does not accept a missing or null state.", nameof(state));
+        }
+
+        if (!state.IsWellFormed)
+        {
+            throw new ArgumentException("The state contains a lone surrogate, which has no UTF-8 encoding and would be replaced in transit.", nameof(state));
+        }
+    }
+
+    /// <summary>
+    /// The images a call passes, checked against the plan, and — for a state that is already text —
+    /// against the state. A typed state is checked once it is serialized.
+    /// </summary>
+    /// <param name="images">The images, or <see langword="null"/> for an overload that takes none.</param>
+    /// <param name="plan">The plan.</param>
+    /// <param name="state">The state as content, or <see langword="null"/> for a typed state.</param>
+    /// <exception cref="ArgumentException">See <see cref="RequestImages"/>.</exception>
+    private static JevImage[] CheckImages(IReadOnlyList<JevImage>? images, JevDecisionPlan plan, JevContent? state)
+    {
+        var callImages = images is null ? [] : RequestImages.FromCall(images, plan, nameof(images));
+        RequestImages.CheckBoxes(plan, callImages, images is null ? nameof(plan) : nameof(images));
+
+        if (state is { } content)
+        {
+            RequestImages.CheckState(content, plan, callImages);
+        }
+
+        return callImages;
+    }
+
+    private async Task<JevResult> EvaluateCoreAsync(StateSource state, JevDecisionPlan plan, JevImage[] callImages, CallSettings call, CancellationToken cancellationToken)
     {
         using var scope = new CallScope(_settings, _gate, JevOperation.Evaluate, call, cancellationToken);
 
@@ -180,10 +342,12 @@ public sealed class JevClient
             await scope.AdmitAsync().ConfigureAwait(false);
 
             // Encoded once, after admission, so a queued call holds no body; sent unchanged by every attempt.
-            var body = RequestBodyWriter.WriteEvaluate(call.Model, state, plan, _settings.MaxRequestBodyBytes);
+            var body = RequestBodyWriter.WriteEvaluate(call.Model, state, plan, callImages, _settings.MaxRequestBodyBytes);
             scope.Token.ThrowIfCancellationRequested();
 
-            var exchange = await ExchangeAsync(scope, HttpMethod.Post, _systemOneUri, body, call.UseLongContext).ConfigureAwait(false);
+            // TypeSafe asks for the header with every request that has an image or a box question.
+            var images = body.HasImages || plan.HasBoxes;
+            var exchange = await ExchangeAsync(scope, HttpMethod.Post, _systemOneUri, body, call.UseLongContext, images).ConfigureAwait(false);
             var decoded = Decode(exchange, plan);
             var warnings = ConsistencyCheck.Run(plan, decoded, _settings.AbsoluteTolerance, _settings.RelativeTolerance, _settings.NumericalConsistency, exchange.RequestId);
 
@@ -226,7 +390,7 @@ public sealed class JevClient
             cancellationToken.ThrowIfCancellationRequested();
             await scope.AdmitAsync().ConfigureAwait(false);
 
-            var exchange = await ExchangeAsync(scope, HttpMethod.Get, _modelsUri, default, longContext: false).ConfigureAwait(false);
+            var exchange = await ExchangeAsync(scope, HttpMethod.Get, _modelsUri, body: null, longContext: false, images: false).ConfigureAwait(false);
 
             if (!Utf8.IsValid(exchange.Body))
             {
@@ -280,7 +444,7 @@ public sealed class JevClient
     /// the credential for the key again. The response is disposed before any backoff, so a waiting
     /// retry holds no connection. What returns holds no reference to a response or a stream.
     /// </remarks>
-    private async Task<Exchange> ExchangeAsync(CallScope scope, HttpMethod method, Uri uri, ArraySegment<byte> body, bool longContext)
+    private async Task<Exchange> ExchangeAsync(CallScope scope, HttpMethod method, Uri uri, RequestBody? body, bool longContext, bool images)
     {
         while (true)
         {
@@ -297,7 +461,7 @@ public sealed class JevClient
 
             TimeSpan? retryDelay;
 
-            using (var request = CreateRequest(method, uri, body, key, longContext))
+            using (var request = CreateRequest(method, uri, body, key, longContext, images))
             {
                 HttpResponseMessage response;
                 scope.Transmission = JevRequestTransmission.Unknown;
@@ -390,7 +554,7 @@ public sealed class JevClient
         return new JevHttpException(scope.Operation, (int)response.StatusCode, requestId, errorType, retryAfter, validationErrors, captured);
     }
 
-    private static HttpRequestMessage CreateRequest(HttpMethod method, Uri uri, ArraySegment<byte> body, string key, bool longContext)
+    private static HttpRequestMessage CreateRequest(HttpMethod method, Uri uri, RequestBody? body, string key, bool longContext, bool images)
     {
         var request = new HttpRequestMessage(method, uri)
         {
@@ -400,11 +564,9 @@ public sealed class JevClient
             VersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
         };
 
-        if (body.Array is not null)
+        if (body is not null)
         {
-            var content = new ByteArrayContent(body.Array, body.Offset, body.Count);
-            content.Headers.TryAddWithoutValidation("Content-Type", "application/json");
-            request.Content = content;
+            request.Content = body.CreateContent();
         }
 
         // Added without validation because every value is fixed or has been checked: the key is
@@ -416,6 +578,11 @@ public sealed class JevClient
         if (longContext)
         {
             request.Headers.TryAddWithoutValidation(JevContract.LongContextHeader, JevContract.LongContextHeaderValue);
+        }
+
+        if (images)
+        {
+            request.Headers.TryAddWithoutValidation(JevContract.ImagesHeader, JevContract.ImagesHeaderValue);
         }
 
         return request;

@@ -24,6 +24,21 @@ Generated from the same snapshot of TypeSafe's contract as 0.1.2-alpha.
   an evaluation is sent with `TypeSafe-Danger-Zone-Long-Context: true`, which raises the model's
   per-request and per-question context limits. Off by default. A call's own value wins over the
   client's, and listing models never sends the header.
+- Images, experimental. `JevImage.FromBytes` takes a PNG or JPEG file and gives it a reference to
+  write wherever the image belongs. An image the state shows is passed with the call, through new
+  overloads of `EvaluateAsync` and `EvaluateContentAsync`; an image a question shows is added to
+  the plan with `JevDecisionPlanBuilder.AddImage`, and every call sends it. A request with an image
+  is sent as `multipart/form-data` with `TypeSafe-Danger-Zone-Images: true`, and the images count
+  towards `MaxRequestBodyBytes`, which applies to the whole form.
+- Box questions, experimental. `JevDecisionPlanBuilder.AddBox` asks where something is in an
+  image, and `JevResult.Get(JevBoxHandle)` returns a `BoxAnswer`: four edges as fractions of the
+  image, and a confidence that is `null` when the service sends none. Edges that cross are
+  reported as `JevConsistencyCheck.BoxEdgeOrder`, like any other inconsistency.
+- What images and box questions add is marked `[Experimental("JEV001")]`, as TypeSafe marks them
+  experimental: add `JEV001` to `<NoWarn>` to use it. Images and references that do not match — an
+  image no text references, a reference whose image is not sent — are refused before anything is
+  sent, by `Build` for a plan's own and by the call for the state's, and so is a box question with
+  no image to look at.
 
 ### Changed
 
@@ -36,8 +51,10 @@ Generated from the same snapshot of TypeSafe's contract as 0.1.2-alpha.
   accepted, and a state too long for the default context, sent without it, is refused with `400`
   and `max_tokens_exceeded` in `detail.error_type`. No keyed call has yet sent a state that long
   with long context on.
-- Images and box questions are still not implemented, and the header that switches them on is
-  never sent.
+- Run against the live service with an API key: a PNG in the state, a PNG in a question's
+  instructions beside one in the state, and a box question were each accepted as the form this
+  SDK writes, and the box answer came back in the documented shape, with a numeric confidence.
+  JPEG has been checked offline only.
 
 ## [0.1.2-alpha] - 2026-10-24
 

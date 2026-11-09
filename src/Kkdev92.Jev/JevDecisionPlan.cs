@@ -28,11 +28,12 @@ public sealed class JevDecisionPlan
     private readonly Dictionary<string, int> _slotById;
     private readonly Dictionary<string, int>.AlternateLookup<ReadOnlySpan<char>> _slotLookup;
 
-    internal JevDecisionPlan(PlanToken token, QuestionDefinition[] questions, byte[] encodedQuestions)
+    internal JevDecisionPlan(PlanToken token, QuestionDefinition[] questions, byte[] encodedQuestions, JevImage[] images)
     {
         Token = token;
         Questions = questions;
         EncodedQuestions = encodedQuestions;
+        Images = images;
 
         _slotById = new Dictionary<string, int>(questions.Length, StringComparer.Ordinal);
         var offset = 0;
@@ -43,6 +44,7 @@ public sealed class JevDecisionPlan
             questions[i].ProbabilityOffset = offset;
             offset += questions[i].OutcomeCount;
             HasScores |= questions[i].Kind == QuestionKind.Score;
+            HasBoxes |= questions[i].Kind == QuestionKind.Box;
         }
 
         ProbabilityCount = offset;
@@ -66,6 +68,15 @@ public sealed class JevDecisionPlan
     internal int ProbabilityCount { get; }
 
     internal bool HasScores { get; }
+
+    /// <summary>Whether a question is a box question, which needs an image in every request.</summary>
+    internal bool HasBoxes { get; }
+
+    /// <summary>
+    /// The images the questions show, each once, in the order they were added. Every one of them
+    /// is referenced by some question, and every reference in the questions is to one of them.
+    /// </summary>
+    internal JevImage[] Images { get; }
 
     /// <summary>The slot of a question id, or -1.</summary>
     internal int SlotOf(ReadOnlySpan<char> id) => _slotLookup.TryGetValue(id, out var slot) ? slot : -1;

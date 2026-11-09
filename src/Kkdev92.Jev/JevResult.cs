@@ -1,5 +1,7 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using Kkdev92.Jev.Decoding;
+using Kkdev92.Jev.Internal;
 using Kkdev92.Jev.Planning;
 
 namespace Kkdev92.Jev;
@@ -86,6 +88,25 @@ public sealed class JevResult
         return new NoulAnswer(_decoded.Slots[slot].Value);
     }
 
+    /// <summary>The answer to a box question.</summary>
+    /// <param name="handle">The handle <see cref="JevDecisionPlanBuilder.AddBox"/> returned.</param>
+    /// <exception cref="InvalidOperationException">The handle is default, or belongs to another plan.</exception>
+    [Experimental(Experiments.Images)]
+    public BoxAnswer Get(JevBoxHandle handle)
+    {
+        var definition = handle.Definition;
+        var slot = SlotOf(definition);
+        var edges = _decoded.Probabilities.AsSpan(definition!.ProbabilityOffset, BoxQuestionDefinition.EdgeCount);
+        var confidence = _decoded.Slots[slot].Confidence;
+
+        return new BoxAnswer(
+            edges[BoxQuestionDefinition.Top],
+            edges[BoxQuestionDefinition.Bottom],
+            edges[BoxQuestionDefinition.Left],
+            edges[BoxQuestionDefinition.Right],
+            double.IsNaN(confidence) ? null : confidence);
+    }
+
     /// <summary>The answer count and the model. Never an answer.</summary>
     public override string ToString() => $"JevResult ({Plan.QuestionCount.ToString(CultureInfo.InvariantCulture)} answers from {ActualModel})";
 
@@ -165,4 +186,11 @@ public enum JevConsistencyCheck
 
     /// <summary>A score is the probability-weighted mean of its levels. The deviation is the score minus that mean.</summary>
     ScoreIsExpectation = 3,
+
+    /// <summary>
+    /// A box's left edge is less than its right, and its top less than its bottom. The deviation is
+    /// how far the edges cross: the larger of left minus right and top minus bottom.
+    /// </summary>
+    [Experimental(Experiments.Images)]
+    BoxEdgeOrder = 4,
 }

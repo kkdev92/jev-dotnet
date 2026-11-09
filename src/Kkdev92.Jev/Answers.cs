@@ -1,7 +1,9 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
 using Kkdev92.Jev.Decoding;
+using Kkdev92.Jev.Internal;
 using Kkdev92.Jev.Planning;
 
 namespace Kkdev92.Jev;
@@ -203,6 +205,63 @@ public readonly struct NoulAnswer
 
     /// <summary>The type name. Never the probability.</summary>
     public override string ToString() => nameof(NoulAnswer);
+}
+
+/// <summary>The answer to a box question: where the target is in the image, as the four edges of a box around it.</summary>
+/// <remarks>
+/// <para>
+/// Each edge is a fraction of the image's size, measured from its top-left corner: <see cref="Left"/>
+/// and <see cref="Right"/> of the width, <see cref="Top"/> and <see cref="Bottom"/> of the height,
+/// each from 0 to 1, so the same answer holds at any image size. Multiply by the width or height in
+/// pixels to draw the box or crop to it. TypeSafe documents that left is less than right and top
+/// less than bottom; an answer whose edges cross is reported with
+/// <see cref="JevConsistencyCheck.BoxEdgeOrder"/>.
+/// </para>
+/// <para>
+/// There is no "not found": a box question about something the image does not show still returns
+/// four edges. Ask a noul question in the same plan whether the target is there.
+/// </para>
+/// <para>
+/// The values are the service's, unchanged. Experimental, as TypeSafe's box questions are: the
+/// answer can change between its releases. <see cref="ToString"/> reports the type name only.
+/// </para>
+/// </remarks>
+[Experimental(Experiments.Images)]
+public readonly struct BoxAnswer
+{
+    internal BoxAnswer(double top, double bottom, double left, double right, double? confidence)
+    {
+        Top = top;
+        Bottom = bottom;
+        Left = left;
+        Right = right;
+        Confidence = confidence;
+    }
+
+    /// <summary>The top edge, as a fraction of the image's height from its top.</summary>
+    public double Top { get; }
+
+    /// <summary>The bottom edge, as a fraction of the image's height from its top.</summary>
+    public double Bottom { get; }
+
+    /// <summary>The left edge, as a fraction of the image's width from its left.</summary>
+    public double Left { get; }
+
+    /// <summary>The right edge, as a fraction of the image's width from its left.</summary>
+    public double Right { get; }
+
+    /// <summary>
+    /// How sure the model is of the box, from 0 to 1, or <see langword="null"/> when the service
+    /// sent none.
+    /// </summary>
+    /// <remarks>
+    /// TypeSafe documents a number and recommends no threshold yet. Its API description also allows
+    /// null, which is kept as <see langword="null"/> rather than replaced with a number.
+    /// </remarks>
+    public double? Confidence { get; }
+
+    /// <summary>The type name. Never the edges.</summary>
+    public override string ToString() => nameof(BoxAnswer);
 }
 
 /// <summary>A model or alias the key can use, as <c>GET /v1/models</c> lists it.</summary>

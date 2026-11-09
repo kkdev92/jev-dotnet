@@ -133,8 +133,28 @@ internal static partial class LiveReport
             "noul" => $"`{id}` (noul): {Spelled(answer.GetProperty("noul"), numbers)}",
             "choice" => DescribeChoice(id, answer, numbers),
             "score" => DescribeScore(id, answer, levelsSent.GetValueOrDefault(id), numbers),
+            "box" => DescribeBox(id, answer, numbers),
             _ => $"`{id}`: an answer of a type this report does not know",
         };
+
+    /// <summary>The four edges and the confidence as spelled, whether the edges are in order, and the names of any fields the contract does not list.</summary>
+    private static string DescribeBox(string id, JsonElement answer, List<string> numbers)
+    {
+        string[] edgeNames = ["top", "bottom", "left", "right"];
+        var box = answer.GetProperty("box");
+        var spelled = string.Join(", ", edgeNames.Select(name => $"{name} {Spelled(box.GetProperty(name), numbers)}"));
+        var confidence = answer.GetProperty("confidence");
+        var crossing = Math.Max(
+            box.GetProperty("left").GetDouble() - box.GetProperty("right").GetDouble(),
+            box.GetProperty("top").GetDouble() - box.GetProperty("bottom").GetDouble());
+        var unlisted = box.EnumerateObject().Select(p => p.Name).Except(edgeNames)
+            .Concat(answer.EnumerateObject().Select(p => p.Name).Except(["type", "box", "confidence"]))
+            .ToList();
+
+        return Invariant($"`{id}` (box): {spelled}; confidence {(confidence.ValueKind == JsonValueKind.Null ? "null" : Spelled(confidence, numbers))}; ")
+            + (crossing > 0 ? Invariant($"edges cross by {crossing:R}") : "edges in order")
+            + (unlisted.Count == 0 ? string.Empty : "; fields the contract does not list: " + string.Join(", ", unlisted.Select(n => $"`{n}`")));
+    }
 
     private static string DescribeChoice(string id, JsonElement answer, List<string> numbers)
     {

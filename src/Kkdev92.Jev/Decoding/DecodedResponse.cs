@@ -18,7 +18,7 @@ internal sealed class DecodedResponse(string model, JevUsage usage, AnswerSlot[]
     /// <summary>One per question, in plan order.</summary>
     public AnswerSlot[] Slots { get; } = slots;
 
-    /// <summary>Every question's probabilities, each at the offset its definition records.</summary>
+    /// <summary>Every question's numbers — the probabilities of a choice or a score, the edges of a box — each at the offset its definition records.</summary>
     public double[] Probabilities { get; } = probabilities;
 
     /// <summary>One per question when the plan has score questions; default for the others. Null when it has none.</summary>
@@ -31,7 +31,7 @@ internal struct AnswerSlot
     /// <summary>The noul probability, or the score's expected value.</summary>
     public double Value;
 
-    /// <summary>The confidence of a choice or a score. A noul has none, and this stays NaN.</summary>
+    /// <summary>The confidence of a choice, a score or a box. NaN for a noul, which has none, and for a box whose confidence is null.</summary>
     public double Confidence;
 
     /// <summary>The index of the chosen option, for a choice.</summary>

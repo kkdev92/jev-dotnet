@@ -15,7 +15,8 @@
     "from the route, and the SDK's names should not depend on how the service generates them.",
     "Verified against info.version 0.2.0 on 2026-09-23: 2 operations exist, 2 are approved.",
     "Omitted parts recorded on 2026-10-24 against the snapshot retrieved that day (still info.version 0.2.0).",
-    "The long-context header approved on 2026-11-09 against the same snapshot: the document retrieved that day was byte-identical."
+    "The long-context header approved on 2026-11-09 against the same snapshot: the document retrieved that day was byte-identical.",
+    "The images header, the multipart form and the box question and answer approved on 2026-11-09 against the same snapshot, which brought in every part omitted on 2026-10-24. Nothing is omitted now; the rules above still hold for anything omitted later."
   ],
   "operations": [
     {
@@ -24,6 +25,11 @@
       "exposedAs": "JevClient.EvaluateAsync, JevClient.EvaluateContentAsync",
       "constant": "SystemOne",
       "headers": [
+        {
+          "name": "TypeSafe-Danger-Zone-Images",
+          "exposedAs": "sent with every evaluation that carries an image (JevDecisionPlanBuilder.AddImage, the images of JevClient.EvaluateAsync and EvaluateContentAsync) or asks a box question (JevDecisionPlanBuilder.AddBox)",
+          "constant": "Images"
+        },
         {
           "name": "TypeSafe-Danger-Zone-Long-Context",
           "exposedAs": "JevClientOptions.UseLongContext, JevRequestOptions.UseLongContext",
@@ -39,190 +45,5 @@
     }
   ],
   "excluded": [],
-  "omitted": [
-    {
-      "pointer": "/paths/~1v1~1systemone/post/parameters/0",
-      "equals": {
-        "in": "header",
-        "name": "TypeSafe-Danger-Zone-Images",
-        "schema": {
-          "enum": [
-            "true"
-          ],
-          "type": "string"
-        }
-      },
-      "reason": "An optional header that switches on images and box questions, which this SDK does not expose. Never sent."
-    },
-    {
-      "pointer": "/paths/~1v1~1systemone/post/requestBody/content/multipart~1form-data",
-      "equals": {
-        "encoding": {
-          "request": {
-            "contentType": "application/json"
-          }
-        },
-        "schema": {
-          "additionalProperties": {
-            "contentMediaType": "image/*",
-            "type": "string"
-          },
-          "properties": {
-            "request": {
-              "contentMediaType": "application/json",
-              "contentSchema": {
-                "$ref": "#/components/schemas/SystemOneRequest"
-              }
-            }
-          },
-          "required": [
-            "request"
-          ],
-          "type": "object"
-        }
-      },
-      "reason": "A form that carries image files alongside the request. The SDK sends every request as application/json."
-    },
-    {
-      "pointer": "/components/schemas/SystemOneRequest/properties/assets",
-      "equals": {
-        "additionalProperties": {
-          "$ref": "#/components/schemas/Asset"
-        },
-        "minProperties": 1,
-        "type": "object"
-      },
-      "reason": "Images for asset and box questions, which this SDK does not expose. Never sent."
-    },
-    {
-      "pointer": "/components/schemas/Question/discriminator/mapping/box",
-      "equals": "#/components/schemas/BoxQuestion",
-      "reason": "Box questions, which this SDK does not expose. A plan never contains one."
-    },
-    {
-      "pointer": "/components/schemas/Answer/discriminator/mapping/box",
-      "equals": "#/components/schemas/BoxAnswer",
-      "reason": "The answer to a box question. A plan never asks one, and the response reader refuses an answer of a type it does not know."
-    },
-    {
-      "pointer": "/components/schemas/Asset",
-      "equals": {
-        "properties": {
-          "data_base64": {
-            "type": "string"
-          },
-          "format": {
-            "enum": [
-              "png",
-              "jpg",
-              "jpeg"
-            ],
-            "type": "string"
-          },
-          "part": {
-            "type": "string"
-          },
-          "type": {
-            "const": "image",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "reason": "Referenced only from the omitted assets property."
-    },
-    {
-      "pointer": "/components/schemas/BoxQuestion",
-      "equals": {
-        "properties": {
-          "instructions": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "items": {},
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "x-accepts": "string | object | array"
-          },
-          "type": {
-            "const": "box",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type"
-        ],
-        "type": "object"
-      },
-      "reason": "Referenced only from the omitted box member of Question."
-    },
-    {
-      "pointer": "/components/schemas/BoxAnswer",
-      "equals": {
-        "properties": {
-          "box": {
-            "$ref": "#/components/schemas/BoxCoordinates"
-          },
-          "confidence": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "type": {
-            "const": "box",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "box",
-          "confidence"
-        ],
-        "type": "object"
-      },
-      "reason": "Referenced only from the omitted box member of Answer."
-    },
-    {
-      "pointer": "/components/schemas/BoxCoordinates",
-      "equals": {
-        "properties": {
-          "bottom": {
-            "type": "number"
-          },
-          "left": {
-            "type": "number"
-          },
-          "right": {
-            "type": "number"
-          },
-          "top": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "top",
-          "bottom",
-          "left",
-          "right"
-        ],
-        "type": "object"
-      },
-      "reason": "Referenced only from BoxAnswer, which is omitted."
-    }
-  ]
+  "omitted": []
 }

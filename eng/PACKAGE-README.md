@@ -89,6 +89,12 @@ using Kkdev92.Jev.DependencyInjection;
 services.AddJev(options => options.Credential = myCredential);
 ```
 
+Images and box questions — finding where something is in an image — are experimental, as they are
+at TypeSafe. Their types and members are marked `[Experimental("JEV001")]`; add `JEV001` to
+`<NoWarn>` to use them. The
+[readme](https://github.com/kkdev92/jev-dotnet/blob/main/README.md#images-and-box-questions-experimental)
+shows how.
+
 Errors are typed: `JevHttpException` (with `StatusCode`, `RetryAfter`, `RequestId`),
 `JevProtocolException` for a `200` that does not answer the plan, `JevTransportException`,
 `JevLimitException`, and `JevTimeoutException`, which derives from `TimeoutException`. Each says

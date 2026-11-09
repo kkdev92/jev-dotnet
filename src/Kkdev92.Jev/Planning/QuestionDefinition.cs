@@ -18,6 +18,7 @@ internal enum QuestionKind : byte
     Noul = 1,
     Choice = 2,
     Score = 3,
+    Box = 4,
 }
 
 /// <summary>A question as registered: validated, copied, and fixed in its slot.</summary>
@@ -39,10 +40,10 @@ internal abstract class QuestionDefinition(PlanToken owner, int slot, string id,
 
     public abstract QuestionKind Kind { get; }
 
-    /// <summary>How many probabilities the answer carries: one per option or level, none for a noul.</summary>
+    /// <summary>How many numbers the answer keeps in a result's shared array: a probability per option or level, a box's four edges, none for a noul.</summary>
     public abstract int OutcomeCount { get; }
 
-    /// <summary>Where this question's probabilities start in a result's shared array. Set when the plan is built.</summary>
+    /// <summary>Where this question's numbers start in a result's shared array. Set when the plan is built.</summary>
     public int ProbabilityOffset { get; set; }
 
     /// <summary>The <c>type</c> discriminator.</summary>
@@ -51,6 +52,7 @@ internal abstract class QuestionDefinition(PlanToken owner, int slot, string id,
         QuestionKind.Noul => "noul",
         QuestionKind.Choice => "choice",
         QuestionKind.Score => "score",
+        QuestionKind.Box => "box",
         _ => throw new InvalidOperationException("Unknown question kind."),
     };
 
@@ -186,5 +188,24 @@ internal sealed class ScoreQuestionDefinition(PlanToken owner, int slot, string 
         }
 
         writer.WriteEndArray();
+    }
+}
+
+/// <summary>A box question: where something is in an image. It takes no criteria.</summary>
+internal sealed class BoxQuestionDefinition(PlanToken owner, int slot, string id, JevContent instructions)
+    : QuestionDefinition(owner, slot, id, instructions)
+{
+    /// <summary>Where each edge is kept, from the question's offset.</summary>
+    public const int Top = 0, Bottom = 1, Left = 2, Right = 3;
+
+    /// <summary>How many edges a box has.</summary>
+    public const int EdgeCount = 4;
+
+    public override QuestionKind Kind => QuestionKind.Box;
+
+    public override int OutcomeCount => EdgeCount;
+
+    protected override void WriteCriteria(Utf8JsonWriter writer)
+    {
     }
 }

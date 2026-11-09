@@ -7,6 +7,12 @@
     <Description>Unofficial .NET 10 SDK for Jev, TypeSafe's System One API. Typed decision plans encoded once and reused, answers checked against the contract before you read them, a contract generated from the service's own OpenAPI document, zero non-framework runtime dependencies, Native AOT ready.</Description>
     <!-- The core has no package references at all, so reference verification is meaningful here. -->
     <VerifyReferenceAotCompatibility>true</VerifyReferenceAotCompatibility>
+    <!--
+      JEV001 marks the image and box API as experimental for the applications that use it. The
+      compiler reports it inside this assembly too, where the request and response code is built on
+      that API, so it is suppressed here, where no consumer inherits the suppression.
+    -->
+    <NoWarn>$(NoWarn);JEV001</NoWarn>
   </PropertyGroup>
 
   <!--

@@ -36,5 +36,5 @@ public class RequestBenchmarks
     }
 
     [Benchmark(Description = "encode request body")]
-    public int Encode() => RequestBodyWriter.WriteEvaluate(JevClientOptions.DefaultModelName, StateSource.FromContent(_state), _plan, int.MaxValue).Length;
+    public int Encode() => RequestBodyWriter.WriteEvaluate(JevClientOptions.DefaultModelName, StateSource.FromContent(_state), _plan, [], int.MaxValue).Length;
 }

@@ -1,8 +1,10 @@
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
 using Kkdev92.Jev.Internal;
 using Kkdev92.Jev.Planning;
+using Kkdev92.Jev.Requests;
 using Kkdev92.Jev.Serialization;
 using Kkdev92.Jev.Wire;
 
@@ -52,6 +54,7 @@ public sealed class JevDecisionPlanBuilder
     private readonly PlanToken _token = new();
     private readonly List<QuestionDefinition> _questions = [];
     private readonly HashSet<string> _ids = new(StringComparer.Ordinal);
+    private readonly List<JevImage> _images = [];
     private State _state;
 
     private enum State
@@ -204,11 +207,78 @@ public sealed class JevDecisionPlanBuilder
         return new JevNoulHandle(definition);
     }
 
+    /// <summary>Adds a question that finds where something is in an image, answered with the four edges of a box around it.</summary>
+    /// <param name="id">The name the answer comes back under. See <see cref="AddChoice{T}"/>.</param>
+    /// <param name="instructions">
+    /// What to find, and in which image: "the coffee mug in `photo`" is enough. See
+    /// <see cref="AddChoice{T}"/>. A picture of the target can be part of it, through its
+    /// <see cref="JevImage.Reference"/>.
+    /// </param>
+    /// <returns>A handle for reading the answer from a <see cref="JevResult"/> of this plan.</returns>
+    /// <remarks>
+    /// <para>
+    /// Every evaluation of the plan then needs an image, from the plan or from the call; one with
+    /// none is refused before it is sent. The answer is always a box: there is no "not found", so a
+    /// question about something absent still returns four edges. TypeSafe suggests asking a noul
+    /// question beside it whether the target is there at all.
+    /// </para>
+    /// <para>
+    /// Experimental, as TypeSafe's box questions are: the request, the answer and their limits can
+    /// change between its releases.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="id"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">An argument breaks a rule above.</exception>
+    /// <exception cref="InvalidOperationException">The builder has already built, or is full.</exception>
+    [Experimental(Experiments.Images)]
+    public JevBoxHandle AddBox(string id, JevContent instructions)
+    {
+        ThrowIfNotMutable();
+        ValidateId(id);
+        ValidateInstructions(instructions);
+
+        var definition = new BoxQuestionDefinition(_token, _questions.Count, id, instructions);
+        Register(definition);
+        return new JevBoxHandle(definition);
+    }
+
+    /// <summary>Adds an image that the plan's instructions or criteria show.</summary>
+    /// <param name="image">
+    /// The image. Its <see cref="JevImage.Reference"/> must appear in the instructions or criteria of
+    /// at least one question by the time the plan is built. Adding the same image again changes nothing.
+    /// </param>
+    /// <remarks>
+    /// <para>
+    /// Every evaluation of the plan sends the image, once, however many questions show it. An image
+    /// only the state shows is passed with the call instead.
+    /// </para>
+    /// <para>
+    /// The service adds an image again for every place its reference appears, and each copy counts
+    /// towards the request's context length. An image several questions look at costs less in the
+    /// state, referred to by name from each question, than in each question's instructions.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="image"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">The builder has already built.</exception>
+    [Experimental(Experiments.Images)]
+    public void AddImage(JevImage image)
+    {
+        ThrowIfNotMutable();
+        ArgumentNullException.ThrowIfNull(image);
+
+        if (!_images.Contains(image))
+        {
+            _images.Add(image);
+        }
+    }
+
     /// <summary>Validates the whole plan, encodes its questions once, and freezes it.</summary>
     /// <returns>The plan. Every handle this builder issued belongs to it.</returns>
     /// <exception cref="InvalidOperationException">
     /// The builder has already built, has no questions, or its questions encode to more than
-    /// <see cref="MaxEncodedQuestionsBytes"/>. After a failed build the builder cannot be used again.
+    /// <see cref="MaxEncodedQuestionsBytes"/>; an image added with <see cref="AddImage"/> appears in
+    /// no question, or a question references an image that was not added. After a failed build the
+    /// builder cannot be used again.
     /// </exception>
     public JevDecisionPlan Build()
     {
@@ -224,10 +294,47 @@ public sealed class JevDecisionPlanBuilder
 
         var questions = _questions.ToArray();
         var encoded = Encode(questions);
-        var plan = new JevDecisionPlan(_token, questions, encoded);
+        var images = _images.ToArray();
+        CheckImageReferences(encoded, images);
+        var plan = new JevDecisionPlan(_token, questions, encoded, images);
 
         _state = State.Frozen;
         return plan;
+    }
+
+    /// <summary>
+    /// Holds the plan's images to its questions: each one shown by some question, and every
+    /// reference in a question to one of them.
+    /// </summary>
+    /// <remarks>
+    /// The service refuses an image nothing references. A reference whose image is not sent it
+    /// reads as text, and answers about that text; the plan is where such a reference would be
+    /// fixed, so it is refused here rather than at every call.
+    /// </remarks>
+    private static void CheckImageReferences(byte[] encoded, JevImage[] images)
+    {
+        if (images.Length == 0 && !ImageReferences.MayContain(encoded))
+        {
+            return;
+        }
+
+        var found = new HashSet<string>(StringComparer.Ordinal);
+        ImageReferences.CollectFromJson(encoded, found);
+
+        foreach (var image in images)
+        {
+            if (!found.Remove(image.Reference))
+            {
+                throw new InvalidOperationException(
+                    "An image added with AddImage appears in no question's instructions or criteria. Write its Reference where a question shows it, or pass it with the call if only the state shows it.");
+            }
+        }
+
+        if (found.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "A question's instructions or criteria contain the reference of an image the plan was not given, so the service would read the reference as text. Add the image with AddImage.");
+        }
     }
 
     /// <summary>

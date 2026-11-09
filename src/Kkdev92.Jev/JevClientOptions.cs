@@ -113,7 +113,11 @@ public sealed class JevClientOptions
     /// </remarks>
     public bool RetryNetworkFailures { get; set; }
 
-    /// <summary>The largest request body the client will send, 4 MiB by default. Not the model's context length, which is measured in tokens.</summary>
+    /// <summary>
+    /// The largest request body the client will send, 4 MiB by default. Not the model's context
+    /// length, which is measured in tokens. A request with images is a form, and the limit applies
+    /// to all of it, images included.
+    /// </summary>
     public int MaxRequestBodyBytes { get; set; } = 4 * 1024 * 1024;
 
     /// <summary>The largest successful response body the client will read, 4 MiB by default.</summary>
@@ -168,8 +172,9 @@ public sealed class JevClientOptions
 
 /// <summary>What happens when an answer's numbers disagree with each other.</summary>
 /// <remarks>
-/// The checks are that a distribution sums to one, that a choice is the most probable option, and
-/// that a score is the expectation of its levels, each within the configured tolerance. They never
+/// The checks are that a distribution sums to one, that a choice is the most probable option, that
+/// a score is the expectation of its levels, and that a box's edges do not cross, each within the
+/// configured tolerance. They never
 /// change a value: nothing is renormalised or recomputed, and confidence is never derived. A value
 /// outside its documented range — a probability of 1.5 — is refused in either mode.
 /// </remarks>

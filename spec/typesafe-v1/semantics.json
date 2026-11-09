@@ -8,7 +8,8 @@
     "snapshot stops saying what a resolution relies on, generation stops and the resolution has to be revisited.",
     "Everything here was verified on 2026-09-23 against info.version 0.2.0. The base address, the choice and score limits and",
     "status 400 were revisited on 2026-10-24, when the snapshot retrieved that day (still info.version 0.2.0) began to declare them.",
-    "Status 400 was revisited again on 2026-11-09: TypeSafe's errors page names max_tokens_exceeded, and a keyed call showed where it appears."
+    "Status 400 was revisited again on 2026-11-09: TypeSafe's errors page names max_tokens_exceeded, and a keyed call showed where it appears.",
+    "box-confidence-null was added on 2026-11-09, with images and box questions."
   ],
   "constants": [
     {
@@ -271,6 +272,34 @@
       "checks": [
         { "pointer": "/paths/~1v1~1systemone/post/responses/529", "absent": true },
         { "pointer": "/paths/~1v1~1systemone/post/responses/422", "present": true }
+      ]
+    },
+    {
+      "id": "box-confidence-null",
+      "summary": "The box page describes a box answer's confidence as a number from 0 to 1. The OpenAPI document requires the field and admits null, and the HTTP reference says it is null when the model does not provide one, with an example answer whose confidence is null.",
+      "sources": [
+        {
+          "url": "https://api.typesafe.ai/openapi.json",
+          "says": "BoxAnswer.confidence is required, anyOf number, null"
+        },
+        {
+          "url": "https://docs.typesafe.ai/api/system-one",
+          "says": "Confidence for the given box, from 0 to 1, with 1 being more confident. Null when the model does not provide confidence. The box example answers with confidence null"
+        },
+        {
+          "url": "https://docs.typesafe.ai/primitives/box",
+          "says": "confidence: a number from 0 to 1; the example answers with 0.92"
+        },
+        {
+          "url": "Observed 2026-11-09 with an API key",
+          "says": "one box answer, whose confidence was a number"
+        }
+      ],
+      "resolution": "The field must be present. Null is kept as null on BoxAnswer.Confidence, never replaced with a number; a number is held to 0 to 1 within the numerical tolerance, as every other confidence is.",
+      "checks": [
+        { "pointer": "/components/schemas/BoxAnswer/required", "contains": "confidence" },
+        { "pointer": "/components/schemas/BoxAnswer/properties/confidence/anyOf", "contains": { "type": "number" } },
+        { "pointer": "/components/schemas/BoxAnswer/properties/confidence/anyOf", "contains": { "type": "null" } }
       ]
     }
   ]

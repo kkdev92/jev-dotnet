@@ -8,8 +8,9 @@ name: integration
 # that differs from the document, and the questions only a keyed call can settle — the readme
 # lists them under Known Limitations.
 #
-# The budget per run is fixed by the tests themselves: four small evaluations, one model listing,
-# and one evaluation with a state too long for the default context, which the service refuses.
+# The budget per run is fixed by the tests themselves: seven small evaluations, three of them with a
+# small synthetic image, one model listing, and one evaluation with a state too long for the default
+# context, which the service refuses.
 # What needs no key — how a missing or wrong key is refused — is live-keyless.yml's.
 #
 # The tests assert only what the contract promises. What it leaves open — how precise the numbers

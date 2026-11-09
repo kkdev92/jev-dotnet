@@ -10,9 +10,9 @@ using Microsoft.Extensions.DependencyInjection;
 // A library that merely compiles is not evidence of AOT compatibility. This is a real consumer that
 // CI publishes with PublishAot=true, so the trimmer and ILCompiler see the code paths an
 // application would use: text, typed and structured state; choices over an enum, strings and a
-// struct of the caller's own; a score with a structured legend; the model list; every kind of
-// failure a caller has to handle; and the container composing a client. Every response comes from
-// an in-process fake handler, so this never reaches the network.
+// struct of the caller's own; a score with a structured legend; an image and a box question; the
+// model list; every kind of failure a caller has to handle; and the container composing a client.
+// Every response comes from an in-process fake handler, so this never reaches the network.
 
 var failures = 0;
 
@@ -125,6 +125,28 @@ using (var document = JsonDocument.Parse("""{"channel":"email","text":"Charged t
 
 Check("array state is sent as an array", handler.Requests[0].BodyText.Contains("\"state\":[{", StringComparison.Ordinal));
 Check("element state is sent as an object", handler.Requests[1].BodyText.Contains("\"state\":{\"channel\":\"email\"", StringComparison.Ordinal));
+
+// An image and a box question (experimental): the request is a form written from segments, and
+// the answer carries a box.
+var png = TestImages.Png(320, 320, (20, 20, 100));
+var image = JevImage.FromBytes(png);
+var boxBuilder = new JevDecisionPlanBuilder();
+var square = boxBuilder.AddBox("square", "the black square");
+var shown = boxBuilder.AddNoul("shown", "Is there a black square in the image?");
+var boxPlan = boxBuilder.Build();
+
+handler = FakeHttpMessageHandler.Always(new SystemOneResponseBuilder()
+    .Box("square", 0.0625, 0.375, 0.0625, 0.375, null)
+    .Noul("shown", 0.99)
+    .Build());
+client = Client(handler);
+var boxed = await client.EvaluateAsync($"A scanned page: {image.Reference}", [image], boxPlan);
+var form = FormBody.Parse(handler.Requests[0].Body, handler.Requests[0].ContentHeaders["Content-Type"]);
+
+Check("images are sent as a form", form.Count == 2 && form[1].Content.AsSpan().SequenceEqual(png));
+Check("the images header is sent", handler.Requests[0].Headers.TryGetValue("TypeSafe-Danger-Zone-Images", out var imagesHeader) && imagesHeader == "true");
+Check("box edges are read", boxed.Get(square) is { Top: 0.0625, Bottom: 0.375, Left: 0.0625, Right: 0.375, Confidence: null });
+Check("a noul beside a box is read", Math.Abs(boxed.Get(shown).Probability - 0.99) < 1e-12);
 
 // The model list.
 var models = await Client(FakeHttpMessageHandler.Always(FakeResponses.Models())).GetModelsAsync();
