@@ -16,6 +16,17 @@ updates:
           - "xunit*"
           - "Microsoft.NET.Test.Sdk"
           - "Microsoft.Extensions.TimeProvider.Testing"
+    ignore:
+      # Microsoft.Extensions.Http and .Options are direct references of the DependencyInjection
+      # package, so the versions pinned for them become the dependency lower bounds in its
+      # nuspec. A major update would raise every consumer to the newer Microsoft.Extensions
+      # packages, apps still on .NET 10 included, while the packages target net10.0 only.
+      #
+      # Remove this when net11.0 joins the target frameworks. Minor and patch updates still flow.
+      - dependency-name: "Microsoft.Extensions.Http"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Extensions.Options"
+        update-types: ["version-update:semver-major"]
     # The core must keep zero non-framework runtime dependencies. A bot pull request that adds a
     # package reference to src/Kkdev92.Jev is wrong by construction and must be closed rather than
     # merged.
