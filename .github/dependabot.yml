@@ -42,3 +42,12 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    ignore:
+      # Dependabot proposes the newest SDK of any major version, so once a new major ships,
+      # its pull request would propose that major instead of the next 10.0 release, security
+      # releases included, while the packages target net10.0 only.
+      #
+      # Remove this when net11.0 joins the target frameworks, together with the
+      # Microsoft.Extensions entries above.
+      - dependency-name: "dotnet-sdk"
+        update-types: ["version-update:semver-major"]
