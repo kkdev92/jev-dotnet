@@ -9,7 +9,8 @@
     "Everything here was verified on 2026-09-23 against info.version 0.2.0. The base address, the choice and score limits and",
     "status 400 were revisited on 2026-10-24, when the snapshot retrieved that day (still info.version 0.2.0) began to declare them.",
     "Status 400 was revisited again on 2026-11-09: TypeSafe's errors page names max_tokens_exceeded, and a keyed call showed where it appears.",
-    "box-confidence-null was added on 2026-11-09, with images and box questions."
+    "box-confidence-null was added on 2026-11-09, with images and box questions.",
+    "score-expectation-rounding was added on 2026-11-24, from a keyed run."
   ],
   "constants": [
     {
@@ -300,6 +301,33 @@
         { "pointer": "/components/schemas/BoxAnswer/required", "contains": "confidence" },
         { "pointer": "/components/schemas/BoxAnswer/properties/confidence/anyOf", "contains": { "type": "number" } },
         { "pointer": "/components/schemas/BoxAnswer/properties/confidence/anyOf", "contains": { "type": "null" } }
+      ]
+    },
+    {
+      "id": "score-expectation-rounding",
+      "summary": "The OpenAPI document and the HTTP reference call a score the probability-weighted average of its levels. The score page shows that calculation as approximately equal to the score, to two decimals, and a keyed call answered with a score 0.01 away from the weighted mean of the probabilities that came with it.",
+      "sources": [
+        {
+          "url": "https://api.typesafe.ai/openapi.json",
+          "says": "ScoreAnswer.score: Expected score: the probability-weighted average of the rubric levels. ScoreAnswer.probabilities: values sum to approximately 1"
+        },
+        {
+          "url": "https://docs.typesafe.ai/api/system-one",
+          "says": "Expected score: the probability-weighted average of the rubric levels. The probabilities' values sum to approximately 1"
+        },
+        {
+          "url": "https://docs.typesafe.ai/primitives/score",
+          "says": "Multiply each level number by its probability, then add the results; the calculation it shows ends in approximately-equal and the score to two decimals. The score is a probability-weighted mean of the level numbers. probabilities: the sum of all values is 1"
+        },
+        {
+          "url": "Observed 2026-11-24 with an API key",
+          "says": "answered by jev-1.14.0: a three-level score of 0.85 with probabilities 0.15, 0.84 and 0.01, whose weighted mean is 0.86; every probability had at most two decimals, and every distribution summed to exactly 1"
+        }
+      ],
+      "resolution": "The score is kept as sent, never replaced with the mean. JevConsistencyCheck.ScoreIsExpectation compares it with the weighted mean of the probabilities as sent, within the numerical tolerance; at the default of 1e-6, Report mode returns such an answer with a warning and Strict refuses the response. The tolerance stays provisional.",
+      "checks": [
+        { "pointer": "/components/schemas/ScoreAnswer/required", "contains": "score" },
+        { "pointer": "/components/schemas/ScoreAnswer/required", "contains": "probabilities" }
       ]
     }
   ]
