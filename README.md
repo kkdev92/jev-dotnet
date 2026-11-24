@@ -18,7 +18,8 @@ failed loudly than turned into a default._
 > locally) passed — the three question kinds there were then, a structured state, structured
 > levels, a question without instructions, the model list — and the `400`, `401`, `403` and `422`
 > bodies the service sends are the ones the SDK reads. On 2026-11-09 the tests added since passed:
-> long context, a state too long for the default context, images, and a box question.
+> long context, a state too long for the default context, images, and a box question. On
+> 2026-11-24, after `0.3.0-alpha` was published, they all passed again on its source.
 >
 > Every call path is also exercised offline, against hand-written fakes of the HTTP API shaped after
 > TypeSafe's own OpenAPI document. What no call has shown yet — a real `429` or `529`, a server
@@ -615,11 +616,16 @@ reference.
 - **The AI packages have only met fakes.** The guard, the router, the function and the evaluator are
   exercised offline, with a fake judge and a fake provider; none has run in front of a real model
 - **One target.** `net10.0` only; no multi-targeting is planned
-- **The consistency tolerance is provisional.** `1e-6` absolute and relative is this SDK's choice;
-  TypeSafe's OpenAPI document says the probabilities sum to "approximately 1", and its HTTP
-  reference that they sum to 1; neither gives a precision. The first keyed run saw probabilities
-  with at most two decimals that summed to exactly 1, so nothing came near it. It stays provisional
-  until more runs are in, and `Report` mode — the default — only warns
+- **The consistency tolerance is provisional, and tighter than the service's rounding.** `1e-6`
+  absolute and relative is this SDK's choice. TypeSafe's OpenAPI document and HTTP reference say
+  the probabilities sum to "approximately 1", and its page on scores that they sum to 1; none gives
+  a precision. The keyed runs have seen probabilities with at most two decimals, and distributions
+  that summed to exactly 1. A score can still sit off the probability-weighted mean of the
+  probabilities beside it: on 2026-11-24, `jev-1.14.0` answered a three-level score 0.01 away from
+  that mean, and the page on scores itself shows the calculation as approximate, to two decimals.
+  `Report` mode, the default, returns such an answer with a `ScoreIsExpectation` warning; `Strict`
+  refuses the whole response unless `NumericalAbsoluteTolerance` covers the gap. The tolerance
+  stays provisional until more runs are in
 - **Exceptions cannot be constructed by callers.** To test your own error handling, answer with the
   status from a fake `HttpMessageHandler` — which also tests the mapping you depend on
 
