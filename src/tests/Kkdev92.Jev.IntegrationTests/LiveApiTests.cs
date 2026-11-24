@@ -156,9 +156,10 @@ public sealed class LiveApiTests
     /// </summary>
     /// <remarks>
     /// The OpenAPI document lets a state and a level be text, an object or an array, and says a
-    /// legend value can be any of the three; the HTTP reference shows only text. This is the call
-    /// that shows whether the service takes structure as the document says, and what its legend
-    /// gives back for levels that were objects.
+    /// legend value can be any of the three; when this test was written, the HTTP reference showed
+    /// only text, and it now says what the document says. This is the call that shows whether the
+    /// service takes structure as the document says, and what its legend gives back for levels that
+    /// were objects.
     /// </remarks>
     [Fact]
     public async Task EvaluatesAStructuredStateAndStructuredLevels()
@@ -191,8 +192,9 @@ public sealed class LiveApiTests
     /// A question with no instructions is accepted.
     /// </summary>
     /// <remarks>
-    /// The OpenAPI document makes <c>instructions</c> optional, and the HTTP reference says it is
-    /// required. This SDK follows the document — <c>instructions-optional</c>
+    /// The OpenAPI document makes <c>instructions</c> optional; when this test was written, the HTTP
+    /// reference said it was required, and it now says what the document says. This SDK follows
+    /// the document — <c>instructions-optional</c>
     /// in <c>spec/typesafe-v1/semantics.json</c> — and this is the call that settles whether the
     /// service agrees. If it does not, the report records the status and the validation error's
     /// location before the test fails, and the readme's statement that omission is accepted has to

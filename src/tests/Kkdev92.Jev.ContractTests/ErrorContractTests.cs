@@ -21,7 +21,7 @@ public sealed class ErrorContractTests
     public async Task AMissingKeyAnswersForbiddenAndIsReportedWithItsErrorType()
     {
         // Observed rather than documented (missing-key-status in semantics.json): no key is 403, not
-        // the 401 the HTTP reference documents.
+        // the 401 TypeSafe's errors page documents.
         var exception = await Fails<JevHttpException>(new FakeHttpMessageHandler((_, _) => Task.FromResult(FakeResponses.MissingKey())));
 
         Assert.Equal(403, exception.StatusCode);

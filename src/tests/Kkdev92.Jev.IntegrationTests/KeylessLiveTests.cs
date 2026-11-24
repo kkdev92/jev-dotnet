@@ -19,7 +19,7 @@ namespace Kkdev92.Jev.IntegrationTests;
 /// <para>
 /// What this pins is what the repository records as observed rather than documented
 /// (<c>missing-key-status</c> in <c>spec/typesafe-v1/semantics.json</c>): <c>403</c> without a key
-/// and <c>401</c> with a wrong one, where the HTTP reference documents <c>401</c> for both; the
+/// and <c>401</c> with a wrong one, where TypeSafe's errors page documents <c>401</c> for both; the
 /// <c>{"detail":{"error_type":…}}</c> body; the request id's shape; and HTTP/2. The SDK half — the
 /// error type read, the request id kept, a <c>401</c> never retried, the key never repeated — is
 /// also covered offline, against a fake; this is the same path against the real service, so a
@@ -76,7 +76,7 @@ public sealed class KeylessLiveTests
     }
 
     /// <summary>
-    /// No key at all is a <c>403</c>, not the <c>401</c> the HTTP reference documents.
+    /// No key at all is a <c>403</c>, not the <c>401</c> TypeSafe's errors page documents.
     /// </summary>
     /// <remarks>
     /// The SDK cannot send this request: it refuses an empty key before anything leaves the
