@@ -212,9 +212,10 @@ var plan = builder.Build();
 ```
 
 Ids, labels and text are sent exactly as given — never trimmed, normalised or re-cased — and
-compared ordinally. A question id is only a key: TypeSafe's [HTTP reference](https://docs.typesafe.ai/api)
-says it is not sent to the model and not used in inference. `default` instructions leave the field
-out; `JevContent.Null` sends an explicit `null`.
+compared ordinally. A question id is only a key: TypeSafe's
+[page on questions](https://docs.typesafe.ai/primitives) says ids are for your code and are not
+sent to the model. `default` instructions leave the field out; `JevContent.Null` sends an
+explicit `null`.
 
 An id can be left out where nothing outside the plan refers to it:
 `builder.AddNoul("Does the customer need an answer today?")` names the question `q0`, the next one
@@ -591,12 +592,12 @@ reference.
   `Retry-After` or `retry-after-ms` accompany them, follow TypeSafe's documents rather than an
   observation. What a keyed call has settled is recorded in `spec/typesafe-v1/semantics.json`
 - **The limits the SDK enforces are partly its own.** At most 255 choice options and 10 score
-  levels, and at least one option per choice, are what TypeSafe's OpenAPI document declares, and the
-  HTTP reference states the same maxima; at least two levels is the HTTP reference's advice, where
-  the OpenAPI document requires one and the service accepts one. Past the limits the service answers
-  `400`; the SDK refuses before sending. 1,024 questions and 1 MiB of encoded questions per plan are
-  this SDK's. A request under every local limit can still exceed the model's context, which is
-  counted in tokens the SDK cannot count
+  levels, and at least one option per choice, are what TypeSafe's OpenAPI document and HTTP
+  reference declare. At least two levels is the advice of its page on scores, where those two
+  documents require one and the service accepts one. Past the limits the service answers `400`;
+  the SDK refuses before sending. 1,024 questions and 1 MiB of encoded questions per plan are this
+  SDK's. A request under every local limit can still exceed the model's context, which is counted
+  in tokens the SDK cannot count
 - **Images and box questions are experimental, at TypeSafe and here.** Keyed calls have shown the
   service accepting the form as this SDK writes it — a PNG in the state, a PNG in a question's
   instructions beside one in the state, and a box question — and answering in the documented
@@ -650,9 +651,10 @@ handwritten runtime               plans, the response reader, deadline, retry, e
 The generated types are internal. The public surface — plans, handles, answers, errors — is
 written by hand over them, so a change in TypeSafe's document can never reshape it on its own.
 
-Where TypeSafe's own descriptions of the API differ — the OpenAPI document and the HTTP reference —
-the difference is recorded in `spec/typesafe-v1/semantics.json` with its sources and the decision
-taken, and the generator stops if a later contract no longer says what a decision relies on.
+Where TypeSafe's own descriptions of the API differ — the OpenAPI document, the HTTP reference and
+the other documentation pages — the difference is recorded in `spec/typesafe-v1/semantics.json`
+with its sources and the decision taken, and the generator stops if a later contract no longer says
+what a decision relies on.
 
 ---
 
