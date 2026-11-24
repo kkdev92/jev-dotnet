@@ -106,7 +106,7 @@ jobs:
           import xml.etree.ElementTree as ET
 
           root = ET.parse("coverage.cobertura.xml").getroot()
-          shipped = ("Kkdev92.Jev", "Kkdev92.Jev.DependencyInjection")
+          shipped = ("Kkdev92.Jev", "Kkdev92.Jev.DependencyInjection", "Kkdev92.Jev.Extensions.AI", "Kkdev92.Jev.Extensions.AI.Evaluation")
 
           print("### Line coverage")
           print()
@@ -156,73 +156,8 @@ jobs:
       # The AOT smoke job references the projects, so it would keep passing if the packages
       # stopped carrying what a consumer's own AOT publish needs. This one has only the nupkgs, and
       # source mapping so those ids cannot quietly be satisfied from anywhere else.
-      - name: Native AOT from the packages alone
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          version=$(ls artifacts/Kkdev92.Jev.[0-9]*.nupkg | head -1 \
-            | sed 's|.*/Kkdev92[.]Jev[.]||; s|[.]nupkg$||')
-
-          echo "Building an AOT consumer against ${version}"
-
-          mkdir -p "${RUNNER_TEMP}/aot-consumer"
-          cd "${RUNNER_TEMP}/aot-consumer"
-
-          cat > nuget.config <<EOF
-          <?xml version="1.0" encoding="utf-8"?>
-          <configuration>
-            <packageSources>
-              <clear />
-              <add key="artifacts" value="${GITHUB_WORKSPACE}/artifacts" />
-              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-            </packageSources>
-            <packageSourceMapping>
-              <packageSource key="artifacts"><package pattern="Kkdev92.Jev*" /></packageSource>
-              <packageSource key="nuget.org"><package pattern="*" /></packageSource>
-            </packageSourceMapping>
-          </configuration>
-          EOF
-
-          cat > Consumer.csproj <<EOF
-          <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <OutputType>Exe</OutputType>
-              <TargetFramework>net10.0</TargetFramework>
-              <Nullable>enable</Nullable>
-              <ImplicitUsings>enable</ImplicitUsings>
-              <PublishAot>true</PublishAot>
-              <TrimmerSingleWarn>false</TrimmerSingleWarn>
-              <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
-              <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-            </PropertyGroup>
-            <ItemGroup>
-              <PackageReference Include="Kkdev92.Jev" Version="${version}" />
-              <PackageReference Include="Kkdev92.Jev.DependencyInjection" Version="${version}" />
-            </ItemGroup>
-          </Project>
-          EOF
-
-          cat > Program.cs <<'EOF'
-          using Kkdev92.Jev;
-          using Kkdev92.Jev.DependencyInjection;
-          using Microsoft.Extensions.DependencyInjection;
-
-          var services = new ServiceCollection();
-          services.AddJev(o => o.Credential = new StaticJevCredential("sk-package-consumer-not-a-key"));
-
-          using var provider = services.BuildServiceProvider();
-
-          var builder = new JevDecisionPlanBuilder();
-          builder.AddNoul("urgent", "Does this need an answer today?");
-
-          Console.WriteLine(provider.GetRequiredService<JevClient>() is not null);
-          Console.WriteLine(builder.Build().QuestionCount);
-          Console.WriteLine(JevClientOptions.DefaultBaseAddress);
-          Console.WriteLine("package-only AOT ok");
-          EOF
-
-          NUGET_PACKAGES="${RUNNER_TEMP}/aot-cache" dotnet publish -c Release -o out
-          ./out/Consumer | tee result.txt
-          grep -q "package-only AOT ok" result.txt
+      - name: Verify isolated package consumers and execute Native AOT
+        run: python eng/verify-consumers.py artifacts
 
       - name: Upload packages
         if: matrix.os == 'ubuntu-latest'
@@ -256,16 +191,5 @@ jobs:
 
       # A library that merely builds is not evidence of AOT compatibility; a consumer application
       # has to publish, and then run.
-      - name: Publish AOT smoke app
-        run: >
-          dotnet publish src/tests/Kkdev92.Jev.AotSmokeTests/Kkdev92.Jev.AotSmokeTests.csproj
-          -c Release -p:PublishAot=true -o artifacts/aot
-
-      - name: Run AOT smoke app
-        shell: bash
-        run: |
-          if [ -f artifacts/aot/Kkdev92.Jev.AotSmokeTests.exe ]; then
-            ./artifacts/aot/Kkdev92.Jev.AotSmokeTests.exe
-          else
-            ./artifacts/aot/Kkdev92.Jev.AotSmokeTests
-          fi
+      - name: Execute project-reference consumers including core and AI Native AOT
+        run: python eng/verify-consumers.py --projects

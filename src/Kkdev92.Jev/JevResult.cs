@@ -59,7 +59,7 @@ public sealed class JevResult
 
     /// <summary>The answer to a choice question.</summary>
     /// <typeparam name="T">The option value type.</typeparam>
-    /// <param name="handle">The handle <see cref="JevDecisionPlanBuilder.AddChoice{T}"/> returned.</param>
+    /// <param name="handle">The handle <see cref="JevDecisionPlanBuilder.AddChoice{T}(string, JevContent, ReadOnlySpan{JevChoiceOption{T}})"/> returned.</param>
     /// <exception cref="InvalidOperationException">The handle is default, or belongs to another plan.</exception>
     public ChoiceAnswer<T> Get<T>(JevChoiceHandle<T> handle)
         where T : notnull
@@ -69,8 +69,12 @@ public sealed class JevResult
         return new ChoiceAnswer<T>(definition!, _decoded.Probabilities, _decoded.Slots[slot]);
     }
 
+    /// <summary>The continuous score and typed level distribution for this plan's question.</summary>
+    public ScoreAnswer<T> GetScore<T>(JevScoreHandle<T> handle) where T : notnull
+        => new(Get(handle.Raw), handle.Values!);
+
     /// <summary>The answer to a score question.</summary>
-    /// <param name="handle">The handle <see cref="JevDecisionPlanBuilder.AddScore"/> returned.</param>
+    /// <param name="handle">The handle <see cref="JevDecisionPlanBuilder.AddScore(string, JevContent, ReadOnlySpan{JevContent})"/> returned.</param>
     /// <exception cref="InvalidOperationException">The handle is default, or belongs to another plan.</exception>
     public ScoreAnswer Get(JevScoreHandle handle)
     {
@@ -80,7 +84,7 @@ public sealed class JevResult
     }
 
     /// <summary>The answer to a noul question.</summary>
-    /// <param name="handle">The handle <see cref="JevDecisionPlanBuilder.AddNoul"/> returned.</param>
+    /// <param name="handle">The handle <see cref="JevDecisionPlanBuilder.AddNoul(string, JevContent, JevNoulCriteria)"/> returned.</param>
     /// <exception cref="InvalidOperationException">The handle is default, or belongs to another plan.</exception>
     public NoulAnswer Get(JevNoulHandle handle)
     {
@@ -89,7 +93,7 @@ public sealed class JevResult
     }
 
     /// <summary>The answer to a box question.</summary>
-    /// <param name="handle">The handle <see cref="JevDecisionPlanBuilder.AddBox"/> returned.</param>
+    /// <param name="handle">The handle <see cref="JevDecisionPlanBuilder.AddBox(string, JevContent)"/> returned.</param>
     /// <exception cref="InvalidOperationException">The handle is default, or belongs to another plan.</exception>
     [Experimental(Experiments.Images)]
     public BoxAnswer Get(JevBoxHandle handle)

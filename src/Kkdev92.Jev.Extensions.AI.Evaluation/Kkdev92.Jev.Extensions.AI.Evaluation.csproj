@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <JevPackageReadme>$(MSBuildThisFileDirectory)README.md</JevPackageReadme>
+  </PropertyGroup>
+  <Import Project="../Package.props" />
+  <PropertyGroup>
+    <PackageValidationBaselineVersion></PackageValidationBaselineVersion>
+    <LastVersionWithoutBaseline>0.2.1</LastVersionWithoutBaseline>
+    <Description>Microsoft.Extensions.AI.Evaluation integration for Kkdev92.Jev, the unofficial .NET SDK for Jev: one decision about a request and its reply, turned into metrics.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Kkdev92.Jev.Extensions.AI/Kkdev92.Jev.Extensions.AI.csproj" />
+    <PackageReference Include="Microsoft.Extensions.AI.Evaluation" />
+  </ItemGroup>
+</Project>

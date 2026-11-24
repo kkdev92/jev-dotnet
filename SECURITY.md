@@ -4,7 +4,7 @@
 
 Only the most recent release is supported. The `0.x` line is pre-release: breaking changes are
 expected before `1.0.0`, and a fix ships in a new release rather than as a patch to an earlier one.
-Both packages carry the same version and move together.
+All four packages carry the same version and move together.
 
 Deliberately not a list of version numbers — one written here is correct on the day it is written
 and wrong on the day the next release goes out, with nothing failing in between.
@@ -27,7 +27,8 @@ In scope:
 
 - An API key, state, instructions, labels, legends or answers leaking into an exception message, a
   trace or a metric, or into the `ToString()` of a result or an answer
-- A request sent to a host other than the configured origin, or a key sent over anything but HTTPS
+- A request sent to a host other than the configured origin, or a key sent over plain HTTP that
+  was not explicitly allowed
 - A response the SDK accepts when the contract says it should refuse it — a missing answer
   filled in, an unknown label mapped to an option, a number out of range passed through
 - Unbounded work driven by a response: a body read without limit, a retry that ignores the
@@ -58,12 +59,18 @@ keeps where each invalid value was, which can name a question id or a label.
 `JevHttpException.ErrorBody` and `JevResult.RawResponseBody` keep a copy of a body only when
 capturing is switched on, and then for as long as the caller keeps the object.
 
+In the AI packages, `JevAdapterException` and the exceptions derived from it carry a stage and a
+reason code, never the text that was judged or produced. `JevEvaluator<T>` writes the model names
+and the request id into its metrics only when `JevEvaluatorOptions.Metadata` includes
+`RequestIdentifiers`.
+
 ## Security posture
 
 This SDK carries an API key and whatever a caller chooses to send, and applies stricter defaults
 than a general-purpose HTTP client.
 
-**The client never looks for a key on its own.** `JevClientOptions.Credential` is required.
+**The client never looks for a key on its own.** `JevClientOptions.Credential` is required, unless
+`AuthenticationMode` is `None`, which sends no key at all.
 `StaticJevCredential.FromEnvironmentVariable()` reads an environment variable when *you* call it,
 never implicitly, and trims it first, since a value read from a file or a shell often ends with a
 newline. A key that is not printable ASCII without whitespace is refused before it is sent — a
@@ -74,12 +81,25 @@ line.
 never to `HttpClient.DefaultRequestHeaders`, so a client shared between tenants cannot carry one
 tenant's key into another's call.
 
-**Only HTTPS, only the configured origin.** `BaseAddress` must be an absolute HTTPS origin with no
-path, query, fragment or user information, and the validation message does not repeat it, because
-a URI with user information carries a credential.
+**Only the configured origin, and HTTPS unless you say otherwise.** Plain HTTP needs explicit
+permission: `AllowLoopbackHttp` for `localhost`, `127.0.0.1` and `[::1]`, or an exact origin, port
+included, in `AllowedInsecureHttpOrigins`. A key sent over plain HTTP travels in cleartext.
+`BaseAddress` is checked as written, before `Uri` normalizes it, and refused with user information,
+a query, a fragment, an empty port, a `.` or `..` segment or an encoded slash; the validation
+message does not repeat it, because a URI with user information carries a credential. Its path is a
+prefix that the API's fixed paths are appended to, and a request that would leave the configured
+origin is refused. Where a name resolves, and where a proxy or a handler of yours sends a request,
+are the application's.
 
-**Redirects are not followed by the client the DI package builds.** Its primary handler has
-`AllowAutoRedirect = false`, so a key is never replayed to wherever a redirect points. A client you
+**`None` sends no key.** With `AuthenticationMode` set to `None`, no credential is asked for, one
+that is set anyway is refused, and the request carries no `Authorization` header from this SDK. An
+`HttpClient` with a default `Authorization` header is refused before anything is sent, rather than
+let a key through on a request meant to carry none. What your own handlers add — other headers,
+cookies, proxy credentials — stays theirs.
+
+**The client the DI package builds follows no redirects and keeps no cookies.** Its primary handler
+has `AllowAutoRedirect = false`, so a key is never replayed to wherever a redirect points, and
+`UseCookies = false`; for a plain HTTP `BaseAddress` it also bypasses the system proxy. A client you
 construct yourself uses the `HttpClient` you give it; set the same on its handler.
 
 **Every read is bounded.** A successful body is read under `MaxResponseBodyBytes`, an error body
@@ -93,9 +113,11 @@ deadline, ends the call instead of holding it, however large the number.
 ## Traces and HTTP instrumentation
 
 This SDK's activities and metrics carry only the right-hand column above. .NET's own
-`System.Net.Http` instrumentation records the request URL as well; for this API that is
-`https://api.typesafe.ai/v1/systemone` or `/v1/models`, with no identifiers in it, and the key is
-in a header that instrumentation does not record.
+`System.Net.Http` instrumentation records the request URL as well: the configured `BaseAddress`
+with `v1/systemone` or `v1/models` appended, which for TypeSafe is
+`https://api.typesafe.ai/v1/systemone` or `/v1/models`, with no identifiers in it. Keep credentials,
+tenant identifiers and anything else you would not log out of the path of a `BaseAddress` of your
+own. The key is in a header that instrumentation does not record.
 
 With the DI package, `IHttpClientFactory`'s own logging also records each request's method and
 URL, as it does for every client it creates; since .NET 9 it redacts every header value unless told

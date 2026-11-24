@@ -23,7 +23,7 @@ public sealed class JevClientOptions
     public const string DefaultModelName = Wire.JevContract.DefaultModel;
 
     /// <summary>
-    /// Where the API key comes from. Required: the client never looks for a key on its own.
+    /// Required in ApiKey mode and omitted in None mode. The client never looks for a key on its own.
     /// </summary>
     public IJevCredential? Credential { get; set; }
 
@@ -52,8 +52,17 @@ public sealed class JevClientOptions
     /// </remarks>
     public bool UseLongContext { get; set; }
 
+    /// <summary>The authentication applied to each attempt, unless overridden by a request.</summary>
+    public JevAuthenticationMode AuthenticationMode { get; set; } = JevAuthenticationMode.ApiKey;
+
+    /// <summary>Allow plain HTTP to localhost, 127.0.0.1 or [::1] on any port.</summary>
+    public bool AllowLoopbackHttp { get; set; }
+
+    /// <summary>Explicit plain HTTP origins matched by host and effective port at construction.</summary>
+    public IReadOnlyList<Uri> AllowedInsecureHttpOrigins { get; set; } = Array.Empty<Uri>();
+
     /// <summary>
-    /// The API origin. An absolute HTTPS URI with no path, query, fragment or user information.
+    /// The directory before the fixed API paths. HTTPS by default. An optional path prefix is preserved.
     /// </summary>
     public Uri BaseAddress { get; set; } = DefaultBaseAddress;
 

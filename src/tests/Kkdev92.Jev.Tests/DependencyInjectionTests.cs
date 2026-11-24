@@ -64,6 +64,8 @@ public sealed class DependencyInjectionTests
         var primary = Assert.IsType<SocketsHttpHandler>(handler);
 
         Assert.False(primary.AllowAutoRedirect);
+        Assert.False(primary.UseCookies);
+        Assert.True(primary.UseProxy);
         Assert.Equal(DecompressionMethods.None, primary.AutomaticDecompression);
     }
 

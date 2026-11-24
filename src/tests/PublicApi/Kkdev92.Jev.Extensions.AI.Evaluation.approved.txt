@@ -1,0 +1,27 @@
+enum Kkdev92.Jev.Extensions.AI.Evaluation.JevEvaluationFailureBehavior : System.Int32
+    ReturnFailedMetrics = 1
+    Throw = 0
+[Flags] enum Kkdev92.Jev.Extensions.AI.Evaluation.JevEvaluationMetadata : System.Int32
+    None = 0
+    Operational = 1
+    RequestIdentifiers = 2
+sealed class Kkdev92.Jev.Extensions.AI.Evaluation.JevEvaluatorOptions
+    .ctor()
+    Kkdev92.Jev.Extensions.AI.Evaluation.JevEvaluationFailureBehavior FailureBehavior { get; set; }
+    Kkdev92.Jev.Extensions.AI.Evaluation.JevEvaluationMetadata Metadata { get; set; }
+    Kkdev92.Jev.Extensions.AI.JevChatStateOptions? StateOptions { get; set; }
+    Kkdev92.Jev.JevRequestOptions? RequestOptions { get; set; }
+    System.Func<Kkdev92.Jev.JevContent, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.AI.Evaluation.EvaluationContext>, Kkdev92.Jev.JevContent>? ContextProjector { get; set; }
+    System.Int32 MaxAdditionalContexts { get; set; }
+    System.TimeProvider TimeProvider { get; set; }
+    System.TimeSpan? TotalTimeout { get; set; }
+sealed class Kkdev92.Jev.Extensions.AI.Evaluation.JevEvaluator<T> : Microsoft.Extensions.AI.Evaluation.IEvaluator
+    .ctor(Kkdev92.Jev.JevClient judge, Kkdev92.Jev.Extensions.AI.JevProjection<T> projection, System.Collections.Generic.IEnumerable<Kkdev92.Jev.Extensions.AI.Evaluation.JevMetricDefinition<T>> metrics, Kkdev92.Jev.Extensions.AI.Evaluation.JevEvaluatorOptions? options = null)
+    System.Collections.Generic.IReadOnlyCollection<System.String> EvaluationMetricNames { get; }
+    System.Threading.Tasks.ValueTask<Microsoft.Extensions.AI.Evaluation.EvaluationResult> EvaluateAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatResponse modelResponse, Microsoft.Extensions.AI.Evaluation.ChatConfiguration? chatConfiguration = null, System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.Evaluation.EvaluationContext>? additionalContext = null, System.Threading.CancellationToken cancellationToken = default)
+static class Kkdev92.Jev.Extensions.AI.Evaluation.JevMetric
+    static Kkdev92.Jev.Extensions.AI.Evaluation.JevMetricDefinition<T> Boolean<T>(System.String name, System.Func<T, System.Boolean> value, System.Func<T, Microsoft.Extensions.AI.Evaluation.EvaluationMetricInterpretation>? interpretation = null)
+    static Kkdev92.Jev.Extensions.AI.Evaluation.JevMetricDefinition<T> Numeric<T>(System.String name, System.Func<T, System.Double> value, System.Func<T, Microsoft.Extensions.AI.Evaluation.EvaluationMetricInterpretation>? interpretation = null)
+    static Kkdev92.Jev.Extensions.AI.Evaluation.JevMetricDefinition<T> String<T>(System.String name, System.Func<T, System.String> value, System.Func<T, Microsoft.Extensions.AI.Evaluation.EvaluationMetricInterpretation>? interpretation = null)
+abstract class Kkdev92.Jev.Extensions.AI.Evaluation.JevMetricDefinition<T>
+    System.String Name { get; }

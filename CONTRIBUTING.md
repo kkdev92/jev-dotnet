@@ -76,7 +76,8 @@ under `Generated/`, read [Changing the API contract](#changing-the-api-contract)
 emitted, and CI verifies them byte for byte.
 
 1. `src/Kkdev92.Jev` takes **zero non-framework runtime dependencies**. `Microsoft.Extensions.*`
-   belongs in `Kkdev92.Jev.DependencyInjection` and nowhere else.
+   belongs in the packages that integrate with it — `Kkdev92.Jev.DependencyInjection`,
+   `Kkdev92.Jev.Extensions.AI` and `Kkdev92.Jev.Extensions.AI.Evaluation` — and nowhere else.
 2. No `LangVersion` of `latest` or `preview`.
 3. The generated wire types stay `internal`. The public surface is written by hand over them, so a
    change in TypeSafe's document can never reshape it on its own.
@@ -110,7 +111,7 @@ either file always need human review: they widen or narrow what the SDK promises
 
 ## Changing the public API
 
-The public surface of both packages is snapshotted in `src/tests/PublicApi/*.approved.txt`, and
+The public surface of every package is snapshotted in `src/tests/PublicApi/*.approved.txt`, and
 a change to it fails `PublicApiTests` until the snapshot is updated:
 
 ```bash
@@ -142,24 +143,38 @@ items — so `PackageContentTests` asserts each package contains exactly an allo
 entries and records no build-machine path. It runs in CI immediately after packing, and is excluded
 from the ordinary test run because it needs the packed output to exist.
 
+What a consumer gets is checked from the packages alone, with Python 3:
+
+```bash
+python eng/verify-consumers.py artifacts
+```
+
+It builds five small applications that reference only the packed packages — the core alone, with
+dependency injection, with the AI packages, and combinations of them — publishes two with Native
+AOT and runs every one, and fails if any resolves a package it should not, or restores bytes other
+than the ones just packed. With `--projects` instead of a directory, the same applications
+reference the projects; CI runs both.
+
 ## Tests
 
 Every project is under `src/` and in `src/Jev.slnx`: the packages directly in it, and beside them
 `tests/`, `tools/` (the code generator), `benchmarks/` and `samples/`. The contract (`spec/`) and
 the build configuration stay at the repository root.
 
-A project is a package only by opting in: the two package projects import `src/Package.props`,
+A project is a package only by opting in: the four package projects import `src/Package.props`,
 which carries the package metadata, the packed readme and legal files, and the package-validation
 guard. Nothing is inherited by being under `src/`, so a new folder there cannot become a package
-by accident.
+by accident. The core and the dependency-injection package pack `eng/PACKAGE-README.md`; each AI
+package packs the readme beside its project.
 
 | Suite | Purpose |
 |---|---|
-| `Kkdev92.Jev.Tests` | Plans, content, decoding (both decoders, held to the same answers over fixed cases and over generated ones), options, credentials, dependency injection, the public API snapshot, package contents |
-| `Kkdev92.Jev.ContractTests` | The exact HTTP exchange — headers, body, retries, deadline, errors, telemetry — through a fake `HttpMessageHandler` |
+| `Kkdev92.Jev.Tests` | Plans, content, decoding (both decoders, held to the same answers over fixed cases and over generated ones), typed scores, options, credentials, dependency injection and configuration, the AI packages, the public API snapshot, package contents |
+| `Kkdev92.Jev.ContractTests` | The exact HTTP exchange — headers, body, retries, deadline, errors, telemetry, endpoints and authentication modes, batches — through a fake `HttpMessageHandler` |
 | `Kkdev92.Jev.CodeGen.Tests` | Contract integrity, extraction, the generator's determinism and its refusal of anything it does not interpret |
 | `Kkdev92.Jev.IntegrationTests` | The live API, never a pull-request gate. `[Trait("Category", "Integration")]` needs a key and is billed (`integration.yml`); `[Trait("Category", "LiveKeyless")]` needs no key and costs nothing (`live-keyless.yml`). Both run only by hand. The report they write is itself tested offline, on every run |
 | `Kkdev92.Jev.AotSmokeTests` | A console application that CI publishes with Native AOT and runs |
+| `Kkdev92.Jev.AiAotSmokeTests` | The same for the AI packages: an input guard, a router, a buffered output guard, a function and an evaluator, against fakes |
 | `Kkdev92.Jev.TestSupport` | Fakes the suites share. Not a test project, and deliberately free of any test framework, because the AOT smoke application uses it too |
 
 Integration tests must **skip**, not fail, when their key is absent. They read
@@ -240,8 +255,10 @@ recorded there.
 
 1. Version bump, `CHANGELOG.md` (move `[Unreleased]` under the new version, dated), the README
    status line and `PackageValidationBaselineVersion` in `src/Package.props` — the release before
-   this one, and none for the first — in a pull request. `ReleaseVersionTests` fails until the four
-   agree. Merge it.
+   this one — in a pull request. `ReleaseVersionTests` fails until the four agree. A package
+   published for the first time has nothing to compare against: its project clears the baseline
+   and sets `LastVersionWithoutBaseline` to the version being released, so the release after it
+   has to set one. Merge it.
 2. Dispatch `spec-check.yml` by hand. It compares the committed contract with TypeSafe's live
    document and opens an issue when they differ, and a difference is settled before the release,
    not after. It never runs on its own: TypeSafe's terms of use do not allow programs that monitor

@@ -4,6 +4,7 @@ using Kkdev92.Jev;
 using Kkdev92.Jev.AotSmokeTests;
 using Kkdev92.Jev.DependencyInjection;
 using Kkdev92.Jev.TestSupport;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 // Native AOT smoke application.
@@ -93,6 +94,8 @@ var response = new SystemOneResponseBuilder()
 // Text state.
 var handler = FakeHttpMessageHandler.Always(response);
 var client = Client(handler);
+var batched = await client.EvaluateManyAsync(["first", "second"], plan);
+Check("ordered batch", batched.SucceededCount == 2 && batched.Items[1].Index == 1 && batched.Items[1].Result?.Plan == plan);
 var result = await client.EvaluateAsync("請求が二重に発生しています。今日中に対応してください。", plan);
 
 Check("enum choice maps back", result.Get(department).Value == Department.Billing);
@@ -180,16 +183,34 @@ await Expect<JevTransportException>(
 
 // The container composes a client whose transport is the one the DI package promises.
 var services = new ServiceCollection();
-services.AddJev(o => o.Credential = new StaticJevCredential("sk-aot-smoke-not-a-key"))
-    .ConfigurePrimaryHttpMessageHandler(() => FakeHttpMessageHandler.Always(response));
+var connection = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+{
+    ["BaseAddress"] = "http://127.0.0.1:11434/decision/",
+    ["AllowLoopbackHttp"] = "true",
+    ["AuthenticationMode"] = "None",
+    ["DefaultModel"] = "local-model",
+}).Build();
+var localHandler = FakeHttpMessageHandler.Always(response);
+services.AddJev(connection, o => o.AdditionalRetries = 0)
+    .ConfigurePrimaryHttpMessageHandler(() => localHandler);
 
 using (var provider = services.BuildServiceProvider())
 {
     var fromContainer = provider.GetRequiredService<JevClient>();
     var answered = await fromContainer.EvaluateAsync("text", plan);
 
+    var localRequest = localHandler.Requests.Single();
+    Check("configuration preserves the prefix and sends anonymous requests",
+        localRequest.Uri.AbsoluteUri == "http://127.0.0.1:11434/decision/v1/systemone" &&
+        !localRequest.Headers.ContainsKey("Authorization") && !localRequest.Headers.ContainsKey("Cookie"));
     Check("container composes a working client", answered.Get(department).Value == Department.Billing);
 }
+
+var scoreBuilder = new JevDecisionPlanBuilder();
+var scoring = scoreBuilder.AddScore<int>("Rate urgency", [new(10, "low"), new(90, "high")]);
+var scored = await Client(FakeHttpMessageHandler.Always(new SystemOneResponseBuilder().Score("q0", 0.75, 0.5,
+    ["low", "high"], 0.25, 0.75).Build())).EvaluateAsync("text", scoreBuilder.Build());
+Check("typed score retains the continuous expectation", scored.GetScore(scoring).Value == 0.75 && scored.GetScore(scoring).MostLikely == 90);
 
 Console.WriteLine();
 Console.WriteLine(failures == 0 ? "aot smoke ok" : $"{failures} check(s) failed");

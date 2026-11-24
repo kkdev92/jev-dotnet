@@ -8,15 +8,45 @@ using Triage;
 //
 // Every run is one billed evaluation. The key is read from the environment because this sample
 // asks for it explicitly; the client itself never looks for one.
+//
+// A server of your own that serves the same API can stand in for TypeSafe. Name its address and
+// the model it serves; it is reached over plain HTTP on this machine, and no key is sent to it:
+//
+//   dotnet run --project src/samples/Triage.Console -- --local http://127.0.0.1:8080/ <model> "message text"
 
-if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(StaticJevCredential.DefaultEnvironmentVariable)))
+var local = args.FirstOrDefault() == "--local";
+var options = new JevClientOptions();
+
+if (local)
 {
-    Console.Error.WriteLine($"Set {StaticJevCredential.DefaultEnvironmentVariable} to a TypeSafe API key. Each run is one billed evaluation.");
-    return 2;
+    if (args.Length < 3 || !Uri.TryCreate(args[1], UriKind.Absolute, out var address))
+    {
+        Console.Error.WriteLine("Usage: --local <base-address> <model> [message text]");
+        return 2;
+    }
+
+    options.BaseAddress = address;
+    options.AllowLoopbackHttp = true;
+    options.AuthenticationMode = JevAuthenticationMode.None;
+    options.DefaultModel = args[2];
+
+    // A model running on this machine can take longer than the 30-second default.
+    options.Timeout = TimeSpan.FromSeconds(60);
+}
+else
+{
+    if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(StaticJevCredential.DefaultEnvironmentVariable)))
+    {
+        Console.Error.WriteLine($"Set {StaticJevCredential.DefaultEnvironmentVariable} to a TypeSafe API key. Each run is one billed evaluation.");
+        return 2;
+    }
+
+    options.Credential = StaticJevCredential.FromEnvironmentVariable();
 }
 
-var message = args.Length > 0
-    ? string.Join(' ', args)
+var words = local ? args[3..] : args;
+var message = words.Length > 0
+    ? string.Join(' ', words)
     : "I was charged twice for my subscription this month and I need the second payment refunded before Friday.";
 
 // Built once and reused for every message: the questions are validated and encoded here, not on
@@ -43,20 +73,20 @@ var plan = builder.Build();
 
 // One long-lived HttpClient for the process. Redirects are not followed, so the key is never
 // replayed to another host, and the HttpClient has no timeout of its own: the client's deadline
-// (30 seconds by default, retries included) is the one that applies.
+// (30 seconds by default, retries included) is the one that applies. No cookies are kept, and
+// plain HTTP to this machine does not go through the system proxy.
 using var httpClient = new HttpClient(new SocketsHttpHandler
 {
+    UseCookies = false,
     AllowAutoRedirect = false,
+    UseProxy = !local,
     PooledConnectionLifetime = TimeSpan.FromMinutes(5),
 })
 {
     Timeout = Timeout.InfiniteTimeSpan,
 };
 
-var client = new JevClient(httpClient, new JevClientOptions
-{
-    Credential = StaticJevCredential.FromEnvironmentVariable(),
-});
+var client = new JevClient(httpClient, options);
 
 try
 {
@@ -76,7 +106,7 @@ try
 }
 catch (JevHttpException ex) when (ex.StatusCode is 401 or 403)
 {
-    Console.Error.WriteLine("The API key was not accepted.");
+    Console.Error.WriteLine(local ? "The server asked for credentials, and this sample sends none to it." : "The API key was not accepted.");
     return 1;
 }
 catch (JevHttpException ex) when (ex.IsRateLimited || ex.IsOverloaded)

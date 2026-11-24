@@ -20,10 +20,10 @@ public sealed class CallScopeTests
     }
 
     [Fact]
-    public void BeforeTheDeadlineAResultIsLetThrough()
+    public async Task BeforeTheDeadlineAResultIsLetThrough()
     {
         var clock = new FakeTimeProvider();
-        using var scope = Scope(clock, CancellationToken.None);
+        await using var scope = Scope(clock, CancellationToken.None);
 
         clock.Advance(TimeSpan.FromSeconds(29));
 
@@ -31,10 +31,10 @@ public sealed class CallScopeTests
     }
 
     [Fact]
-    public void PastTheDeadlineAResultIsRefusedAsATimeout()
+    public async Task PastTheDeadlineAResultIsRefusedAsATimeout()
     {
         var clock = new FakeTimeProvider();
-        using var scope = Scope(clock, CancellationToken.None);
+        await using var scope = Scope(clock, CancellationToken.None);
 
         clock.Advance(TimeSpan.FromSeconds(30));
 
@@ -46,11 +46,11 @@ public sealed class CallScopeTests
     /// caller's cancellation, in the same order every other failure of the call is classified.
     /// </summary>
     [Fact]
-    public void PastTheDeadlineTheCallersCancellationIsReportedFirst()
+    public async Task PastTheDeadlineTheCallersCancellationIsReportedFirst()
     {
         var clock = new FakeTimeProvider();
         using var caller = new CancellationTokenSource();
-        using var scope = Scope(clock, caller.Token);
+        await using var scope = Scope(clock, caller.Token);
 
         clock.Advance(TimeSpan.FromSeconds(31));
         caller.Cancel();

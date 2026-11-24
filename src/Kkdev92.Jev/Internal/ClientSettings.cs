@@ -16,12 +16,13 @@ internal sealed class ClientSettings
     /// <summary>The longest timeout a <see cref="CancellationTokenSource"/> can represent.</summary>
     public static readonly TimeSpan MaxTimeout = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
 
-    private ClientSettings(JevClientOptions options)
+    private ClientSettings(JevClientOptions options, Uri baseDirectory)
     {
-        Credential = options.Credential!;
+        Credential = options.Credential;
+        AuthenticationMode = options.AuthenticationMode;
         DefaultModel = options.DefaultModel;
         UseLongContext = options.UseLongContext;
-        BaseAddress = options.BaseAddress;
+        BaseAddress = baseDirectory;
         Timeout = options.Timeout;
         AdditionalRetries = options.AdditionalRetries;
         RetryBackoffInitial = options.RetryBackoffInitial;
@@ -42,11 +43,13 @@ internal sealed class ClientSettings
         Jitter = options.JitterSource ?? Random.Shared.NextDouble;
     }
 
-    public IJevCredential Credential { get; }
+    public IJevCredential? Credential { get; }
 
     public string DefaultModel { get; }
 
     public bool UseLongContext { get; }
+
+    public JevAuthenticationMode AuthenticationMode { get; }
 
     public Uri BaseAddress { get; }
 
@@ -91,13 +94,10 @@ internal sealed class ClientSettings
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        if (options.Credential is null)
-        {
-            throw new ArgumentException("JevClientOptions.Credential is required. The client never looks for an API key on its own.", nameof(options));
-        }
+        ValidateAuthentication(options.AuthenticationMode, options.Credential);
 
         ValidateModel(options.DefaultModel, $"{nameof(JevClientOptions)}.{nameof(JevClientOptions.DefaultModel)}");
-        ValidateBaseAddress(options.BaseAddress);
+        var baseDirectory = EndpointUris.Directory(options);
         ValidateTimeout(options.Timeout, $"{nameof(JevClientOptions)}.{nameof(JevClientOptions.Timeout)}");
         ValidateRetries(options.AdditionalRetries, $"{nameof(JevClientOptions)}.{nameof(JevClientOptions.AdditionalRetries)}");
 
@@ -151,7 +151,7 @@ internal sealed class ClientSettings
             throw new ArgumentException("JevClientOptions.TimeProvider must not be null.", nameof(options));
         }
 
-        return new ClientSettings(options);
+        return new ClientSettings(options, baseDirectory);
     }
 
     public static void ValidateModel(string? model, string name)
@@ -180,20 +180,16 @@ internal sealed class ClientSettings
         }
     }
 
-    private static void ValidateBaseAddress(Uri? address)
+    internal static void ValidateAuthentication(JevAuthenticationMode mode, IJevCredential? credential)
     {
-        if (address is null
-            || !address.IsAbsoluteUri
-            || address.Scheme != Uri.UriSchemeHttps
-            || !string.IsNullOrEmpty(address.UserInfo)
-            || !string.IsNullOrEmpty(address.Query)
-            || !string.IsNullOrEmpty(address.Fragment)
-            || address.AbsolutePath != "/")
+        if (!Enum.IsDefined(mode))
         {
-            // The address is not echoed: a URI with user information carries a credential.
-            throw new ArgumentException(
-                "JevClientOptions.BaseAddress must be an absolute HTTPS origin, such as https://api.typesafe.ai, with no path, query, fragment or user information.",
-                nameof(address));
+            throw new ArgumentOutOfRangeException(nameof(mode), "AuthenticationMode must name a supported mode.");
+        }
+
+        if ((mode == JevAuthenticationMode.ApiKey) != (credential is not null))
+        {
+            throw new ArgumentException("Credential is required for ApiKey and must be omitted for None.", nameof(credential));
         }
     }
 
@@ -209,7 +205,7 @@ internal sealed class ClientSettings
 /// <summary>The settings of one call: the client's, overridden by the call's own options, frozen when the call starts.</summary>
 internal readonly struct CallSettings
 {
-    private CallSettings(string model, bool longContext, TimeSpan timeout, int retries, IJevCredential credential, bool captureRaw, bool captureError)
+    private CallSettings(string model, bool longContext, TimeSpan timeout, int retries, IJevCredential? credential, bool captureRaw, bool captureError)
     {
         Model = model;
         UseLongContext = longContext;
@@ -229,7 +225,7 @@ internal readonly struct CallSettings
 
     public int AdditionalRetries { get; }
 
-    public IJevCredential Credential { get; }
+    public IJevCredential? Credential { get; }
 
     public bool CaptureRawResponse { get; }
 
@@ -263,12 +259,21 @@ internal readonly struct CallSettings
             ClientSettings.ValidateRetries(r, $"{nameof(JevRequestOptions)}.{nameof(JevRequestOptions.AdditionalRetries)}");
         }
 
+        var mode = options.AuthenticationMode ?? client.AuthenticationMode;
+        var credential = options.Credential;
+        if (mode == JevAuthenticationMode.ApiKey)
+        {
+            credential ??= client.Credential;
+        }
+
+        ClientSettings.ValidateAuthentication(mode, credential);
+
         return new CallSettings(
             model ?? client.DefaultModel,
             options.UseLongContext ?? client.UseLongContext,
             timeout ?? client.Timeout,
             retries ?? client.AdditionalRetries,
-            options.Credential ?? client.Credential,
+            credential,
             options.CaptureRawResponse ?? client.CaptureRawResponse,
             options.CaptureErrorBody ?? client.CaptureErrorBody);
     }

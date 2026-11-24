@@ -10,11 +10,8 @@ namespace Kkdev92.Jev.Transport;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The deadline is one <see cref="CancellationTokenSource"/> driven by the configured
-/// <see cref="TimeProvider"/>, started when the call starts and linked to the caller's token. Every
-/// awaited step — admission, the credential, each send, each body read, each backoff — observes the
-/// linked token, so the budget covers all of them and a retry never resets it. When the call needs
-/// neither (no timeout, a token that cannot be cancelled) no source is created at all.
+/// A single timer and the caller's registration signal an SDK-owned token. Admission, credential,
+/// send, body read, and backoff share it. An unlimited, uncancelable call needs no source.
 /// </para>
 /// <para>
 /// A failure is classified in a fixed order: the caller's cancellation first, then the SDK's
@@ -23,44 +20,32 @@ namespace Kkdev92.Jev.Transport;
 /// in the same instant, and only a genuine deadline becomes <see cref="JevTimeoutException"/>.
 /// </para>
 /// </remarks>
-internal sealed class CallScope : IDisposable
+internal sealed class CallScope : IAsyncDisposable
 {
     private readonly ClientSettings _settings;
     private readonly AdmissionGate? _gate;
     private readonly CancellationToken _callerToken;
-    private readonly CancellationTokenSource? _deadline;
-    private readonly CancellationTokenSource? _linked;
+    private CallCancellation? _cancellation;
     private readonly long _started;
     private readonly Activity? _activity;
+    private readonly AttemptHistory? _history;
     private bool _admitted;
     private string _outcome = JevTelemetry.Outcomes.Error;
 
-    public CallScope(ClientSettings settings, AdmissionGate? gate, JevOperation operation, CallSettings call, CancellationToken callerToken)
+    public CallScope(ClientSettings settings, AdmissionGate? gate, JevOperation operation, CallSettings call, CancellationToken callerToken, AttemptHistory? history = null)
     {
         _settings = settings;
         _gate = gate;
+        _history = history;
         _callerToken = callerToken;
         Operation = operation;
         Call = call;
         _started = settings.TimeProvider.GetTimestamp();
 
-        if (call.Timeout != System.Threading.Timeout.InfiniteTimeSpan)
+        if (call.Timeout != System.Threading.Timeout.InfiniteTimeSpan || callerToken.CanBeCanceled)
         {
-            _deadline = new CancellationTokenSource(call.Timeout, settings.TimeProvider);
-
-            if (callerToken.CanBeCanceled)
-            {
-                _linked = CancellationTokenSource.CreateLinkedTokenSource(callerToken, _deadline.Token);
-                Token = _linked.Token;
-            }
-            else
-            {
-                Token = _deadline.Token;
-            }
-        }
-        else
-        {
-            Token = callerToken;
+            _cancellation = new CallCancellation(call.Timeout, settings.TimeProvider, callerToken);
+            Token = _cancellation.Token;
         }
 
         _activity = JevTelemetry.Start(operation);
@@ -83,6 +68,8 @@ internal sealed class CallScope : IDisposable
 
     /// <summary>How far the current attempt got, for an exception thrown now.</summary>
     public JevRequestTransmission Transmission { get; set; } = JevRequestTransmission.NotStarted;
+
+    public void FinishAttempt() => _history?.Include(Transmission);
 
     public TimeSpan Elapsed => _settings.TimeProvider.GetElapsedTime(_started);
 
@@ -171,13 +158,21 @@ internal sealed class CallScope : IDisposable
     /// </remarks>
     public void ThrowIfDeadlinePassed()
     {
-        if (_deadline is null || (!_deadline.IsCancellationRequested && Elapsed < Call.Timeout))
-        {
-            return;
-        }
-
         _callerToken.ThrowIfCancellationRequested();
-        throw new JevTimeoutException(Operation, Call.Timeout, Transmission, innerException: null);
+        if (DeadlinePassed)
+        {
+            throw new JevTimeoutException(Operation, Call.Timeout, Transmission, innerException: null);
+        }
+    }
+
+    private bool DeadlinePassed => Call.Timeout != System.Threading.Timeout.InfiniteTimeSpan
+        && (Token.IsCancellationRequested || Elapsed >= Call.Timeout);
+
+    public ValueTask DrainAsync()
+    {
+        var cancellation = _cancellation;
+        _cancellation = null;
+        return cancellation?.DisposeAsync() ?? ValueTask.CompletedTask;
     }
 
     public void Succeeded(int statusCode, string? requestId, int requestBytes, int responseBytes, JevUsage? usage)
@@ -221,20 +216,20 @@ internal sealed class CallScope : IDisposable
         {
             // The caller asked for this, whatever else happened at the same moment.
             OperationCanceledException when _callerToken.IsCancellationRequested
-                => new OperationCanceledException("The call was canceled.", exception, _callerToken),
+                => new OperationCanceledException("The call was canceled.", null, _callerToken),
 
             // A cancellation that surfaced because the deadline fired is the deadline. Only a
             // cancellation: an HTTP error that arrived just before the deadline is still that error.
-            OperationCanceledException when _deadline?.IsCancellationRequested == true
+            OperationCanceledException when DeadlinePassed
                 => new JevTimeoutException(Operation, Call.Timeout, Transmission, innerException: null),
 
             // HttpClient.Timeout: HttpClient cancels with a TimeoutException inside.
             OperationCanceledException { InnerException: TimeoutException }
-                => new JevTransportException(Operation, JevTransportFailure.HttpClientTimeout, JevRequestTransmission.Unknown, exception),
+                => new JevTransportException(Operation, JevTransportFailure.HttpClientTimeout, JevRequestTransmission.Unknown, null),
 
             // A cancellation nobody here asked for, from a handler. Not reported as the caller's.
             OperationCanceledException
-                => new JevTransportException(Operation, JevTransportFailure.Unknown, JevRequestTransmission.Unknown, exception),
+                => new JevTransportException(Operation, JevTransportFailure.Unknown, JevRequestTransmission.Unknown, null),
 
             HttpRequestException request
                 => TransportFailures.FromSend(Operation, request),
@@ -267,16 +262,16 @@ internal sealed class CallScope : IDisposable
         return translated;
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
+        FinishAttempt();
+        await DrainAsync().ConfigureAwait(false);
+
         if (_admitted)
         {
             _gate!.Exit();
             _admitted = false;
         }
-
-        _linked?.Dispose();
-        _deadline?.Dispose();
 
         var operationTag = new KeyValuePair<string, object?>(JevTelemetry.OperationTag, Operations.TagValue(Operation));
 
@@ -302,8 +297,22 @@ internal static class TransportFailures
         {
             // The connection was never established, so nothing was sent.
             HttpRequestError.NameResolutionError or HttpRequestError.ConnectionError or HttpRequestError.SecureConnectionError or HttpRequestError.ProxyTunnelError
-                => new JevTransportException(operation, JevTransportFailure.Connect, JevRequestTransmission.NotStarted, exception),
+                => new JevTransportException(operation, JevTransportFailure.Connect, JevRequestTransmission.NotStarted, null),
 
-            _ => new JevTransportException(operation, JevTransportFailure.Unknown, JevRequestTransmission.Unknown, exception),
+            _ => new JevTransportException(operation, JevTransportFailure.Unknown, JevRequestTransmission.Unknown, null),
         };
+}
+
+/// <summary>Records final attempt states across one batch item, after send classification.</summary>
+internal sealed class AttemptHistory
+{
+    public JevRequestTransmission Transmission { get; private set; }
+
+    public void Include(JevRequestTransmission transmission)
+    {
+        if (transmission > Transmission)
+        {
+            Transmission = transmission;
+        }
+    }
 }

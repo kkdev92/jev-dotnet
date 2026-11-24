@@ -88,7 +88,13 @@ internal static class JevTelemetry
 
     public static Activity? Start(JevOperation operation)
     {
-        var activity = Source.StartActivity(operation == JevOperation.Evaluate ? "Jev.Evaluate" : "Jev.ListModels", ActivityKind.Internal);
+        var activity = Source.StartActivity(operation switch
+        {
+            JevOperation.Evaluate => "Jev.Evaluate",
+            JevOperation.ListModels => "Jev.ListModels",
+            JevOperation.EvaluateMany => "Jev.EvaluateMany",
+            _ => "Jev.Operation",
+        }, ActivityKind.Internal);
 
         if (activity is { IsAllDataRequested: true })
         {

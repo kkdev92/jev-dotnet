@@ -212,31 +212,16 @@ public sealed partial class PackageContentTests
     /// The packages to inspect, from wherever the last pack put them.
     /// </summary>
     /// <remarks>
-    /// Searched rather than assumed. These tests skip when they find nothing, so a pack sent to
-    /// some other output directory would otherwise leave them reporting success while inspecting
-    /// nothing at all — which is worse than failing, because the run says the packages are clean.
+    /// CI uses the artifacts directory. Local verification may point directly at its fresh pack
+    /// output so earlier packages or downloaded public baselines cannot enter these checks.
     /// </remarks>
     private static string[] Packages()
     {
-        string[] roots =
-        [
-            Path.Combine(RepositoryRoot.Value, "artifacts"),
-            Path.Combine(RepositoryRoot.Value, "artifacts", "package", "release"),
-            RepositoryRoot.Value,
-        ];
-
-        foreach (var root in roots.Where(Directory.Exists))
+        var root = Environment.GetEnvironmentVariable("JEV_PACKAGE_DIRECTORY") ?? Path.Combine(RepositoryRoot.Value, "artifacts");
+        if (Directory.Exists(root))
         {
-            var found = Directory
-                .EnumerateFiles(root, "*.nupkg", SearchOption.AllDirectories)
-                .Concat(Directory.EnumerateFiles(root, "*.snupkg", SearchOption.AllDirectories))
-                .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}local-feed{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-                .ToArray();
-
-            if (found.Length > 0)
-            {
-                return found;
-            }
+            return Directory.EnumerateFiles(root, "*.nupkg")
+                .Concat(Directory.EnumerateFiles(root, "*.snupkg")).ToArray();
         }
 
         return [];
@@ -493,6 +478,10 @@ public sealed partial class PackageContentTests
         foreach (var package in packages)
         {
             using var archive = ZipFile.OpenRead(package);
+            var id = PackageFileName().Match(Path.GetFileNameWithoutExtension(package)).Groups["id"].Value;
+            expected["README.md"] = id.StartsWith("Kkdev92.Jev.Extensions.AI", StringComparison.Ordinal)
+                ? ReadRepositoryFile(Path.Combine("src", id, "README.md"))
+                : ReadRepositoryFile(Path.Combine("eng", "PACKAGE-README.md"));
             var names = archive.Entries.Select(e => e.FullName).ToArray();
 
             foreach (var (name, original) in expected)

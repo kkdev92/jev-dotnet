@@ -297,7 +297,8 @@ public sealed class ErrorContractTests
 
         Assert.Equal(JevTransportFailure.Connect, exception.Failure);
         Assert.Equal(JevRequestTransmission.NotStarted, exception.Transmission);
-        Assert.IsType<HttpRequestException>(exception.InnerException);
+        Assert.Null(exception.InnerException);
+        Assert.DoesNotContain("refused", exception.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -38,7 +38,7 @@ namespace Kkdev92.Jev;
 /// the key or the service's own error text.
 /// </para>
 /// </remarks>
-public sealed class JevClient
+public sealed partial class JevClient
 {
     private static readonly string UserAgent = "Kkdev92.Jev/" + JevTelemetry.Version;
 
@@ -64,9 +64,10 @@ public sealed class JevClient
         ArgumentNullException.ThrowIfNull(httpClient);
         _settings = ClientSettings.From(options);
         _httpClient = httpClient;
+        EnsureAuthenticationHeaders(_settings.Credential);
         _gate = sharedGate ?? (_settings.ConcurrencyLimit is { } limit ? new AdmissionGate(limit, _settings.MaxQueuedRequests) : null);
-        _systemOneUri = new Uri(_settings.BaseAddress, JevContract.SystemOnePath);
-        _modelsUri = new Uri(_settings.BaseAddress, JevContract.ModelsPath);
+        _systemOneUri = EndpointUris.Join(_settings.BaseAddress, JevContract.SystemOnePath);
+        _modelsUri = EndpointUris.Join(_settings.BaseAddress, JevContract.ModelsPath);
     }
 
     /// <summary>Evaluates text against a plan.</summary>
@@ -88,7 +89,7 @@ public sealed class JevClient
 
         var content = JevContent.FromText(state);
         var callImages = CheckImages(null, plan, content);
-        var call = CallSettings.Resolve(_settings, options);
+        var call = ResolveCall(options);
         return EvaluateCoreAsync(StateSource.FromContent(content), plan, callImages, call, cancellationToken);
     }
 
@@ -128,7 +129,7 @@ public sealed class JevClient
 
         var content = JevContent.FromText(state);
         var callImages = CheckImages(images, plan, content);
-        var call = CallSettings.Resolve(_settings, options);
+        var call = ResolveCall(options);
         return EvaluateCoreAsync(StateSource.FromContent(content), plan, callImages, call, cancellationToken);
     }
 
@@ -160,7 +161,7 @@ public sealed class JevClient
         ArgumentNullException.ThrowIfNull(plan);
 
         var callImages = CheckImages(null, plan, state: null);
-        var call = CallSettings.Resolve(_settings, options);
+        var call = ResolveCall(options);
         return EvaluateCoreAsync(StateSource.FromTyped(state, stateTypeInfo), plan, callImages, call, cancellationToken);
     }
 
@@ -209,7 +210,7 @@ public sealed class JevClient
         ArgumentNullException.ThrowIfNull(plan);
 
         var callImages = CheckImages(images, plan, state: null);
-        var call = CallSettings.Resolve(_settings, options);
+        var call = ResolveCall(options);
         return EvaluateCoreAsync(StateSource.FromTyped(state, stateTypeInfo), plan, callImages, call, cancellationToken);
     }
 
@@ -233,7 +234,7 @@ public sealed class JevClient
         ThrowIfNotSendable(state);
 
         var callImages = CheckImages(null, plan, state);
-        var call = CallSettings.Resolve(_settings, options);
+        var call = ResolveCall(options);
         return EvaluateCoreAsync(StateSource.FromContent(state), plan, callImages, call, cancellationToken);
     }
 
@@ -274,7 +275,7 @@ public sealed class JevClient
         ThrowIfNotSendable(state);
 
         var callImages = CheckImages(images, plan, state);
-        var call = CallSettings.Resolve(_settings, options);
+        var call = ResolveCall(options);
         return EvaluateCoreAsync(StateSource.FromContent(state), plan, callImages, call, cancellationToken);
     }
 
@@ -292,7 +293,7 @@ public sealed class JevClient
     /// <exception cref="OperationCanceledException">Returned through the task: <paramref name="cancellationToken"/> was cancelled.</exception>
     public Task<IReadOnlyList<JevModel>> GetModelsAsync(JevRequestOptions? options = null, CancellationToken cancellationToken = default)
     {
-        var call = CallSettings.Resolve(_settings, options);
+        var call = ResolveCall(options);
         return GetModelsCoreAsync(call, cancellationToken);
     }
 
@@ -332,9 +333,9 @@ public sealed class JevClient
         return callImages;
     }
 
-    private async Task<JevResult> EvaluateCoreAsync(StateSource state, JevDecisionPlan plan, JevImage[] callImages, CallSettings call, CancellationToken cancellationToken)
+    private async Task<JevResult> EvaluateCoreAsync(StateSource state, JevDecisionPlan plan, JevImage[] callImages, CallSettings call, CancellationToken cancellationToken, AttemptHistory? history = null)
     {
-        using var scope = new CallScope(_settings, _gate, JevOperation.Evaluate, call, cancellationToken);
+        var scope = new CallScope(_settings, _gate, JevOperation.Evaluate, call, cancellationToken, history);
 
         try
         {
@@ -351,7 +352,6 @@ public sealed class JevClient
             var decoded = Decode(exchange, plan);
             var warnings = ConsistencyCheck.Run(plan, decoded, _settings.AbsoluteTolerance, _settings.RelativeTolerance, _settings.NumericalConsistency, exchange.RequestId);
 
-            scope.ThrowIfDeadlinePassed();
 
             // Not a conditional expression: ReadOnlyMemory converts implicitly from an array, so a
             // null in either arm becomes an empty memory — a value — and the result would claim a
@@ -365,6 +365,8 @@ public sealed class JevClient
             var metadata = new JevResultMetadata(exchange.RequestId, scope.Attempts, exchange.HttpVersion, scope.Elapsed, warnings);
             var result = new JevResult(plan, call.Model, decoded, metadata, raw);
 
+            await scope.DrainAsync().ConfigureAwait(false);
+            scope.ThrowIfDeadlinePassed();
             scope.Succeeded(exchange.StatusCode, exchange.RequestId, body.Length, exchange.Body.Count, decoded.Usage);
             return result;
         }
@@ -379,11 +381,15 @@ public sealed class JevClient
 
             throw translated;
         }
+        finally
+        {
+            await scope.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
     private async Task<IReadOnlyList<JevModel>> GetModelsCoreAsync(CallSettings call, CancellationToken cancellationToken)
     {
-        using var scope = new CallScope(_settings, _gate, JevOperation.ListModels, call, cancellationToken);
+        var scope = new CallScope(_settings, _gate, JevOperation.ListModels, call, cancellationToken);
 
         try
         {
@@ -398,6 +404,7 @@ public sealed class JevClient
             }
 
             var models = ModelListDecoder.Decode(exchange.Body, exchange.RequestId);
+            await scope.DrainAsync().ConfigureAwait(false);
             scope.ThrowIfDeadlinePassed();
             scope.Succeeded(exchange.StatusCode, exchange.RequestId, 0, exchange.Body.Count, usage: null);
             return models;
@@ -412,6 +419,10 @@ public sealed class JevClient
             }
 
             throw translated;
+        }
+        finally
+        {
+            await scope.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -444,25 +455,44 @@ public sealed class JevClient
     /// the credential for the key again. The response is disposed before any backoff, so a waiting
     /// retry holds no connection. What returns holds no reference to a response or a stream.
     /// </remarks>
+    private CallSettings ResolveCall(JevRequestOptions? options)
+    {
+        var call = CallSettings.Resolve(_settings, options);
+        EnsureAuthenticationHeaders(call.Credential);
+        return call;
+    }
+
+    private void EnsureAuthenticationHeaders(IJevCredential? credential)
+    {
+        if (credential is null && _httpClient.DefaultRequestHeaders.Contains("Authorization"))
+        {
+            throw new InvalidOperationException("AuthenticationMode.None requires an HttpClient without a default Authorization header.");
+        }
+    }
+
     private async Task<Exchange> ExchangeAsync(CallScope scope, HttpMethod method, Uri uri, RequestBody? body, bool longContext, bool images)
     {
         while (true)
         {
+            scope.FinishAttempt();
             scope.Attempts++;
             scope.Transmission = JevRequestTransmission.NotStarted;
 
-            var key = await scope.Call.Credential.GetApiKeyAsync(scope.Token).ConfigureAwait(false);
-
-            if (!TextRules.IsUsableApiKey(key))
+            string? key = null;
+            if (scope.Call.Credential is { } credential)
             {
-                // Refused before anything is sent. The key is not in the message.
-                throw new InvalidOperationException("The credential returned an API key that is empty or contains whitespace, control or non-ASCII characters.");
+                key = await credential.GetApiKeyAsync(scope.Token).ConfigureAwait(false);
+                if (!TextRules.IsUsableApiKey(key))
+                {
+                    throw new InvalidOperationException("The credential returned an API key that is empty or contains whitespace, control or non-ASCII characters.");
+                }
             }
 
             TimeSpan? retryDelay;
 
             using (var request = CreateRequest(method, uri, body, key, longContext, images))
             {
+                EnsureAuthenticationHeaders(scope.Call.Credential);
                 HttpResponseMessage response;
                 scope.Transmission = JevRequestTransmission.Unknown;
 
@@ -502,7 +532,7 @@ public sealed class JevClient
                         {
                             // The service answered and the answer did not arrive in full. It may
                             // well have been billed; retrying it is a network-failure retry.
-                            var failure = new JevTransportException(scope.Operation, JevTransportFailure.ResponseBody, JevRequestTransmission.Started, ex);
+                            var failure = new JevTransportException(scope.Operation, JevTransportFailure.ResponseBody, JevRequestTransmission.Started, null);
                             retryDelay = scope.DecideRetry(networkFailure: true, serverWait: null);
 
                             if (retryDelay is null)
@@ -554,7 +584,7 @@ public sealed class JevClient
         return new JevHttpException(scope.Operation, (int)response.StatusCode, requestId, errorType, retryAfter, validationErrors, captured);
     }
 
-    private static HttpRequestMessage CreateRequest(HttpMethod method, Uri uri, RequestBody? body, string key, bool longContext, bool images)
+    private static HttpRequestMessage CreateRequest(HttpMethod method, Uri uri, RequestBody? body, string? key, bool longContext, bool images)
     {
         var request = new HttpRequestMessage(method, uri)
         {
@@ -571,7 +601,11 @@ public sealed class JevClient
 
         // Added without validation because every value is fixed or has been checked: the key is
         // printable ASCII with no whitespace, so it cannot end the header line.
-        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
+        if (key is not null)
+        {
+            request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
+        }
+
         request.Headers.TryAddWithoutValidation("Accept", "application/json");
         request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
 

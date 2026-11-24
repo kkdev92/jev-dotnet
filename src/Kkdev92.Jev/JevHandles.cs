@@ -10,7 +10,7 @@ namespace Kkdev92.Jev;
 /// <typeparam name="T">The option value type.</typeparam>
 /// <remarks>
 /// <para>
-/// Returned by <see cref="JevDecisionPlanBuilder.AddChoice{T}"/> and used to read the answer with
+/// Returned by <see cref="JevDecisionPlanBuilder.AddChoice{T}(string, JevContent, ReadOnlySpan{JevChoiceOption{T}})"/> and used to read the answer with
 /// <see cref="JevResult.Get{T}(JevChoiceHandle{T})"/>. A handle belongs to the plan built from
 /// the builder that issued it: using it with a result of another plan throws, even when that plan
 /// has a question with the same id.

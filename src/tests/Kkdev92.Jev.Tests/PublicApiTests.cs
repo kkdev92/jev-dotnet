@@ -55,6 +55,8 @@ public sealed class PublicApiTests
     [Theory]
     [InlineData("Kkdev92.Jev")]
     [InlineData("Kkdev92.Jev.DependencyInjection")]
+    [InlineData("Kkdev92.Jev.Extensions.AI")]
+    [InlineData("Kkdev92.Jev.Extensions.AI.Evaluation")]
     public void PublicApiMatchesTheApprovedSurface(string assemblyName)
     {
         var assembly = Assembly.Load(assemblyName);
