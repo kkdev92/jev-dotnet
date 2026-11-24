@@ -5,7 +5,7 @@
   <Import Project="../Package.props" />
   <PropertyGroup>
     <PackageValidationBaselineVersion></PackageValidationBaselineVersion>
-    <LastVersionWithoutBaseline>0.2.1</LastVersionWithoutBaseline>
+    <LastVersionWithoutBaseline>0.3.0</LastVersionWithoutBaseline>
     <Description>Microsoft.Extensions.AI integration for Kkdev92.Jev, the unofficial .NET SDK for Jev: a decision that guards or routes any IChatClient, or that a model calls as an AIFunction.</Description>
   </PropertyGroup>
   <ItemGroup>
