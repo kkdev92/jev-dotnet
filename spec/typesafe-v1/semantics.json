@@ -10,7 +10,9 @@
     "status 400 were revisited on 2026-10-24, when the snapshot retrieved that day (still info.version 0.2.0) began to declare them.",
     "Status 400 was revisited again on 2026-11-09: TypeSafe's errors page names max_tokens_exceeded, and a keyed call showed where it appears.",
     "box-confidence-null was added on 2026-11-09, with images and box questions.",
-    "score-expectation-rounding was added on 2026-11-24, from a keyed run."
+    "score-expectation-rounding was added on 2026-11-24, from a keyed run.",
+    "On 2026-11-24 the HTTP reference was found to carry the OpenAPI document's descriptions, and the status codes it listed to be",
+    "on the errors page. Entries that cited it for anything else now cite where that is said, and say what it said when they were written."
   ],
   "constants": [
     {
@@ -41,7 +43,7 @@
         "https://docs.typesafe.ai/primitives/choice",
         "https://api.typesafe.ai/openapi.json"
       ],
-      "note": "'You can have a maximum of 255 options per Choice.' The OpenAPI document declares the same maximum since the snapshot retrieved 2026-10-24; see the conflict choice-and-score-limits."
+      "note": "'A Choice question accepts up to 255 options.' The OpenAPI document declares the same maximum since the snapshot retrieved 2026-10-24, and the HTTP reference with it; see the conflict choice-and-score-limits."
     },
     {
       "name": "choiceOptionsMinimum",
@@ -58,13 +60,13 @@
         "https://docs.typesafe.ai/primitives/score",
         "https://api.typesafe.ai/openapi.json"
       ],
-      "note": "'A Score should have at least two levels; the API accepts up to 10.' The OpenAPI document declares the same maximum since the snapshot retrieved 2026-10-24; see the conflict choice-and-score-limits."
+      "note": "The score page: 'Should have at least two levels; the API accepts up to 10.' The OpenAPI document declares the same maximum since the snapshot retrieved 2026-10-24, and the HTTP reference with it; see the conflict choice-and-score-limits."
     },
     {
       "name": "scoreLevelsMinimum",
       "value": 2,
       "basis": "decision",
-      "note": "The OpenAPI document requires one level, and the HTTP reference says a Score should have at least two. A one-level score can only ever answer 0 with probability 1, so this SDK refuses it."
+      "note": "The OpenAPI document and the HTTP reference require one level, and the score page says a score should have at least two. A one-level score can only ever answer 0 with probability 1, so this SDK refuses it."
     },
     {
       "name": "requestIdHeader",
@@ -79,14 +81,14 @@
       "name": "retryAfterMillisecondsHeader",
       "value": "retry-after-ms",
       "basis": "decision",
-      "note": "Not in the HTTP reference, which asks for exponential backoff on 429 and 529, and not yet seen on a real 429. Read when present, before Retry-After, because it is the more precise of the two; without either, the SDK's own backoff applies."
+      "note": "Not in the HTTP reference or on the errors page, which asks for exponential backoff on 429 and 529, and not yet seen on a real 429. Read when present, before Retry-After, because it is the more precise of the two; without either, the SDK's own backoff applies."
     },
     {
       "name": "overloadedStatus",
       "value": 529,
       "basis": "documented",
       "sources": [
-        "https://docs.typesafe.ai/api"
+        "https://docs.typesafe.ai/api/errors"
       ],
       "note": "'TypeSafe is temporarily overloaded. Retry after a short delay.' Not a registered HTTP status; see the conflict status-529-undeclared."
     }
@@ -94,7 +96,7 @@
   "conflicts": [
     {
       "id": "instructions-optional",
-      "summary": "The HTTP reference marks instructions required on every question type. The OpenAPI document makes it optional and nullable on all three.",
+      "summary": "When this entry was written, the HTTP reference marked instructions required on every question type. The OpenAPI document makes it optional and nullable on all three, and the HTTP reference now says the same.",
       "sources": [
         {
           "url": "https://api.typesafe.ai/openapi.json",
@@ -102,7 +104,7 @@
         },
         {
           "url": "https://docs.typesafe.ai/api",
-          "says": "instructions: string | object | array, required"
+          "says": "on 2026-09-23: instructions: string | object | array, required. On 2026-11-24: optional and nullable, as in the OpenAPI document"
         },
         {
           "url": "Observed 2026-09-25 with an API key",
@@ -121,7 +123,7 @@
     },
     {
       "id": "score-levels-minimum",
-      "summary": "The OpenAPI document requires one score level. The HTTP reference says a Score should have at least two.",
+      "summary": "The OpenAPI document and the HTTP reference require one score level. The score page says a score should have at least two, as the HTTP reference did when this entry was written.",
       "sources": [
         {
           "url": "https://api.typesafe.ai/openapi.json",
@@ -129,7 +131,11 @@
         },
         {
           "url": "https://docs.typesafe.ai/api",
-          "says": "A Score should have at least two levels"
+          "says": "on 2026-09-23: A Score should have at least two levels. On 2026-11-24: ScoreQuestion.criteria minItems 1, as in the OpenAPI document"
+        },
+        {
+          "url": "https://docs.typesafe.ai/primitives/score",
+          "says": "criteria: Should have at least two levels; the API accepts up to 10."
         },
         {
           "url": "Observed 2026-09-25 with an API key",
@@ -143,7 +149,7 @@
     },
     {
       "id": "score-legend-structured",
-      "summary": "The HTTP reference types the score legend as map<string, string>. The OpenAPI document admits strings, objects and arrays, and the documentation shows a structured legend coming back.",
+      "summary": "When this entry was written, the HTTP reference typed the score legend as map<string, string>. The OpenAPI document admits strings, objects and arrays, the HTTP reference now says the same, and the documentation shows a structured legend coming back.",
       "sources": [
         {
           "url": "https://api.typesafe.ai/openapi.json",
@@ -151,7 +157,7 @@
         },
         {
           "url": "https://docs.typesafe.ai/api",
-          "says": "legend: map<string, string>"
+          "says": "on 2026-09-23: legend: map<string, string>. On 2026-11-24: values anyOf string, object, array, as in the OpenAPI document"
         },
         {
           "url": "https://docs.typesafe.ai/primitives/score",
@@ -169,7 +175,7 @@
     },
     {
       "id": "noul-criteria-null",
-      "summary": "The HTTP reference types Noul criteria descriptions as string, object or array. The OpenAPI document also admits null.",
+      "summary": "When this entry was written, the HTTP reference typed Noul criteria descriptions as string, object or array. The OpenAPI document also admits null, and the HTTP reference now says the same.",
       "sources": [
         {
           "url": "https://api.typesafe.ai/openapi.json",
@@ -177,7 +183,7 @@
         },
         {
           "url": "https://docs.typesafe.ai/api",
-          "says": "true: string | object | array; false: string | object | array"
+          "says": "on 2026-09-23: true: string | object | array; false: string | object | array. On 2026-11-24: each anyOf string, object, array, null, as in the OpenAPI document"
         }
       ],
       "resolution": "Each side may be omitted, null or a value, independently.",
@@ -196,7 +202,7 @@
         },
         {
           "url": "https://docs.typesafe.ai/api",
-          "says": "a maximum of 255 options per Choice; the API accepts up to 10 levels"
+          "says": "on 2026-09-23: a maximum of 255 options per Choice; the API accepts up to 10 levels. On 2026-11-24: maxProperties 255 and maxItems 10, as in the OpenAPI document"
         },
         {
           "url": "Observed 2026-09-25 with an API key",
@@ -211,11 +217,11 @@
     },
     {
       "id": "missing-key-status",
-      "summary": "The HTTP reference answers a missing or invalid API key with 401. Observed: a missing key answers 403, an invalid one 401. Neither status is in the OpenAPI document.",
+      "summary": "TypeSafe's errors page answers a missing or invalid API key with 401, as the HTTP reference did when this entry was written. Observed: a missing key answers 403, an invalid one 401. Neither status is in the OpenAPI document.",
       "sources": [
         {
-          "url": "https://docs.typesafe.ai/api",
-          "says": "401 Unauthorized: Missing or invalid API key"
+          "url": "https://docs.typesafe.ai/api/errors",
+          "says": "401 Unauthorized: Missing or invalid API key. Check the Authorization header."
         },
         {
           "url": "Observed 2026-09-23 without a key and with a malformed one",
@@ -258,15 +264,15 @@
     },
     {
       "id": "status-529-undeclared",
-      "summary": "The HTTP reference documents 529 Overloaded. The OpenAPI document lists only 200 and 422.",
+      "summary": "TypeSafe's errors page documents 529 Overloaded, as the HTTP reference did when this entry was written. The OpenAPI document does not declare it: it lists 200 and 422, and 400 since the snapshot retrieved 2026-10-24.",
       "sources": [
         {
-          "url": "https://docs.typesafe.ai/api",
+          "url": "https://docs.typesafe.ai/api/errors",
           "says": "529 Overloaded: TypeSafe is temporarily overloaded. Retry after a short delay."
         },
         {
           "url": "https://api.typesafe.ai/openapi.json",
-          "says": "responses 200 and 422 only"
+          "says": "responses 200, 400 and 422; 200 and 422 only before the snapshot retrieved 2026-10-24"
         }
       ],
       "resolution": "529 is kept as a retry candidate (constant overloadedStatus). Retrying stays opt-in.",
