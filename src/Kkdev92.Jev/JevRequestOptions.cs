@@ -10,6 +10,9 @@ namespace Kkdev92.Jev;
 /// </remarks>
 public sealed class JevRequestOptions
 {
+    /// <summary>The authentication mode for this call. None suppresses the client credential.</summary>
+    public JevAuthenticationMode? AuthenticationMode { get; set; }
+
     /// <summary>The model for this call, instead of <see cref="JevClientOptions.DefaultModel"/>.</summary>
     public string? Model { get; set; }
 

@@ -1,6 +1,7 @@
 using System.Net;
 using Kkdev92.Jev.Internal;
 using Kkdev92.Jev.Transport;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -13,12 +14,31 @@ public static class JevServiceCollectionExtensions
     /// <summary>The name of the <see cref="HttpClient"/> the factory creates for <see cref="JevClient"/>.</summary>
     public const string HttpClientName = "Kkdev92.Jev";
 
+    /// <summary>Read connection options from a section, then apply explicit configuration.</summary>
+    public static IHttpClientBuilder AddJev(this IServiceCollection services, IConfiguration configuration, Action<JevClientOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        return services.AddJev(configuration, (_, options) => configure(options));
+    }
+
+    /// <summary>Read a section and resolve credentials or override settings through the service provider.</summary>
+    public static IHttpClientBuilder AddJev(this IServiceCollection services, IConfiguration configuration, Action<IServiceProvider, JevClientOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(configure);
+        return services.AddJev((provider, options) =>
+        {
+            JevConfigurationBinding.Apply(configuration, options);
+            configure(provider, options);
+        });
+    }
+
     /// <summary>
     /// Registers <see cref="JevClient"/>, configured by a delegate.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">
-    /// Sets the options. <see cref="JevClientOptions.Credential"/> must be set here: nothing is read
+    /// Sets the options. <see cref="JevClientOptions.Credential"/> is required in ApiKey mode. Nothing is read
     /// from configuration or the environment on its own.
     /// </param>
     /// <returns>The <see cref="IHttpClientBuilder"/> of the typed client, for adding handlers.</returns>
@@ -75,8 +95,10 @@ public static class JevServiceCollectionExtensions
                 provider.GetRequiredService<IOptions<JevClientOptions>>().Value,
                 provider.GetRequiredService<JevAdmission>().Gate))
             .ConfigureHttpClient(httpClient => httpClient.Timeout = Timeout.InfiniteTimeSpan)
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            .ConfigurePrimaryHttpMessageHandler(provider => new SocketsHttpHandler
             {
+                UseCookies = false,
+                UseProxy = provider.GetRequiredService<IOptions<JevClientOptions>>().Value.BaseAddress.Scheme != Uri.UriSchemeHttp,
                 AllowAutoRedirect = false,
                 AutomaticDecompression = DecompressionMethods.None,
             });

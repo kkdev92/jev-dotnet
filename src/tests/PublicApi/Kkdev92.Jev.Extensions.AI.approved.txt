@@ -1,0 +1,129 @@
+static class Kkdev92.Jev.Extensions.AI.JevAIFunction
+    static Microsoft.Extensions.AI.AIFunction Create<T>(Kkdev92.Jev.JevClient client, Kkdev92.Jev.Extensions.AI.JevProjection<T> projection, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> outputTypeInfo, System.Text.Json.JsonElement outputSchema, System.String name, System.String description, Kkdev92.Jev.Extensions.AI.JevFunctionOptions? options = null)
+class Kkdev92.Jev.Extensions.AI.JevAdapterException : System.Exception, System.Runtime.Serialization.ISerializable
+    Kkdev92.Jev.Extensions.AI.JevAdapterFailureReason ReasonCode { get; }
+    Kkdev92.Jev.Extensions.AI.JevAdapterStage Stage { get; }
+enum Kkdev92.Jev.Extensions.AI.JevAdapterFailureReason : System.Int32
+    BufferLimitExceeded = 9
+    DeadlineExceeded = 18
+    DownstreamFailure = 10
+    EvaluationUnavailable = 15
+    GuardBlocked = 16
+    InvalidDecision = 5
+    InvalidFunctionArguments = 12
+    InvalidProjection = 1
+    MissingFallback = 7
+    NoAnalyzableText = 2
+    ResultLimitExceeded = 13
+    ReviewRequired = 17
+    StateLimitExceeded = 4
+    UnexpectedCancellation = 11
+    UnknownRoute = 6
+    Unspecified = 0
+    UnsupportedContent = 3
+    UnsupportedEvaluationContext = 14
+    UnsupportedStreamingContent = 8
+enum Kkdev92.Jev.Extensions.AI.JevAdapterStage : System.Int32
+    BufferedStreaming = 9
+    Evaluation = 8
+    FunctionInvocation = 7
+    Generation = 5
+    InputGuard = 3
+    Lifecycle = 10
+    OutputGuard = 6
+    ResultProjection = 2
+    Routing = 4
+    StateProjection = 1
+    Unspecified = 0
+enum Kkdev92.Jev.Extensions.AI.JevBlockBehavior : System.Int32
+    ReturnMessage = 1
+    Throw = 0
+static class Kkdev92.Jev.Extensions.AI.JevChatClientBuilderExtensions
+    static Microsoft.Extensions.AI.ChatClientBuilder UseJevGuard(this Microsoft.Extensions.AI.ChatClientBuilder builder, Kkdev92.Jev.JevClient judge, Kkdev92.Jev.Extensions.AI.JevGuardPolicy? inputPolicy = null, Kkdev92.Jev.Extensions.AI.JevGuardPolicy? outputPolicy = null, Kkdev92.Jev.Extensions.AI.JevGuardOptions? options = null)
+    static Microsoft.Extensions.AI.ChatClientBuilder UseJevGuard(this Microsoft.Extensions.AI.ChatClientBuilder builder, System.Func<System.IServiceProvider, Kkdev92.Jev.JevClient> judgeFactory, Kkdev92.Jev.Extensions.AI.JevGuardPolicy? inputPolicy = null, Kkdev92.Jev.Extensions.AI.JevGuardPolicy? outputPolicy = null, Kkdev92.Jev.Extensions.AI.JevGuardOptions? options = null)
+sealed class Kkdev92.Jev.Extensions.AI.JevChatStateOptions
+    .ctor()
+    Kkdev92.Jev.Extensions.AI.JevChatStateScope Scope { get; set; }
+    Kkdev92.Jev.Extensions.AI.JevUnsupportedContentBehavior UnsupportedContentBehavior { get; set; }
+    System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.AI.ChatRole>? IncludedRoles { get; set; }
+    System.Func<System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.AI.ChatMessage>, Microsoft.Extensions.AI.ChatResponse?, Kkdev92.Jev.JevContent>? Projector { get; set; }
+    System.Int32 MaxContentItems { get; set; }
+    System.Int32 MaxMessages { get; set; }
+    System.Int32 MaxStateUtf8Bytes { get; set; }
+enum Kkdev92.Jev.Extensions.AI.JevChatStateScope : System.Int32
+    ConversationText = 2
+    Custom = 5
+    LatestUserText = 1
+    RequestAndResponseText = 4
+    ResponseText = 3
+    Unspecified = 0
+sealed class Kkdev92.Jev.Extensions.AI.JevFunctionOptions
+    .ctor()
+    Kkdev92.Jev.JevRequestOptions? RequestOptions { get; set; }
+    System.Int32 MaxInputUtf8Bytes { get; set; }
+    System.Int32 MaxOutputUtf8Bytes { get; set; }
+    System.TimeProvider TimeProvider { get; set; }
+    System.TimeSpan? TotalTimeout { get; set; }
+sealed class Kkdev92.Jev.Extensions.AI.JevGuardChatClient : Microsoft.Extensions.AI.DelegatingChatClient, Microsoft.Extensions.AI.IChatClient, System.IDisposable
+    .ctor(Microsoft.Extensions.AI.IChatClient innerClient, Kkdev92.Jev.JevClient judge, Kkdev92.Jev.Extensions.AI.JevGuardPolicy? inputPolicy = null, Kkdev92.Jev.Extensions.AI.JevGuardPolicy? outputPolicy = null, Kkdev92.Jev.Extensions.AI.JevGuardOptions? options = null, System.Boolean leaveOpen = false)
+    override System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default)
+    override System.Object? GetService(System.Type serviceType, System.Object? serviceKey = null)
+    override System.Threading.Tasks.Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default)
+enum Kkdev92.Jev.Extensions.AI.JevGuardDecision : System.Int32
+    Allow = 1
+    Block = 3
+    Review = 2
+    Unspecified = 0
+sealed class Kkdev92.Jev.Extensions.AI.JevGuardOptions
+    .ctor()
+    Kkdev92.Jev.Extensions.AI.JevBlockBehavior BlockBehavior { get; set; }
+    Kkdev92.Jev.Extensions.AI.JevOutputStreamingMode OutputStreamingMode { get; set; }
+    System.Int32 MaxBufferedContentItems { get; set; }
+    System.Int32 MaxBufferedUpdates { get; set; }
+    System.Int32 MaxBufferedUtf8Bytes { get; set; }
+    System.String? BlockedMessage { get; set; }
+    System.TimeProvider TimeProvider { get; set; }
+    System.TimeSpan? TotalTimeout { get; set; }
+sealed class Kkdev92.Jev.Extensions.AI.JevGuardPolicy
+    .ctor(Kkdev92.Jev.Extensions.AI.JevProjection<Kkdev92.Jev.Extensions.AI.JevGuardDecision> projection, Kkdev92.Jev.Extensions.AI.JevChatStateOptions? stateOptions = null, Kkdev92.Jev.JevRequestOptions? requestOptions = null)
+    Kkdev92.Jev.Extensions.AI.JevProjection<Kkdev92.Jev.Extensions.AI.JevGuardDecision> Projection { get; }
+sealed class Kkdev92.Jev.Extensions.AI.JevGuardRejectedException : Kkdev92.Jev.Extensions.AI.JevAdapterException, System.Runtime.Serialization.ISerializable
+enum Kkdev92.Jev.Extensions.AI.JevOutputStreamingMode : System.Int32
+    Buffer = 1
+    RejectStreaming = 0
+sealed class Kkdev92.Jev.Extensions.AI.JevPipelineTimeoutException : System.TimeoutException, System.Runtime.Serialization.ISerializable
+    Kkdev92.Jev.Extensions.AI.JevAdapterFailureReason ReasonCode { get; }
+    Kkdev92.Jev.Extensions.AI.JevAdapterStage Stage { get; }
+    System.TimeSpan Timeout { get; }
+sealed class Kkdev92.Jev.Extensions.AI.JevProjectionException : Kkdev92.Jev.Extensions.AI.JevAdapterException, System.Runtime.Serialization.ISerializable
+sealed class Kkdev92.Jev.Extensions.AI.JevProjection<T>
+    .ctor(Kkdev92.Jev.JevDecisionPlan plan, System.Func<Kkdev92.Jev.JevResult, T> project)
+    Kkdev92.Jev.JevDecisionPlan Plan { get; }
+    T Project(Kkdev92.Jev.JevResult result)
+sealed class Kkdev92.Jev.Extensions.AI.JevReviewRequiredException : Kkdev92.Jev.Extensions.AI.JevAdapterException, System.Runtime.Serialization.ISerializable
+readonly struct Kkdev92.Jev.Extensions.AI.JevRouteDecision<TRoute>
+    Kkdev92.Jev.Extensions.AI.JevRouteKind Kind { get; }
+    TRoute Route { get; }
+    static Kkdev92.Jev.Extensions.AI.JevRouteDecision<TRoute> RequireReview()
+    static Kkdev92.Jev.Extensions.AI.JevRouteDecision<TRoute> UseFallback()
+    static Kkdev92.Jev.Extensions.AI.JevRouteDecision<TRoute> UseRoute(TRoute route)
+enum Kkdev92.Jev.Extensions.AI.JevRouteKind : System.Int32
+    Fallback = 2
+    Review = 3
+    Route = 1
+    Unspecified = 0
+sealed class Kkdev92.Jev.Extensions.AI.JevRoutingChatClient<TRoute> : Microsoft.Extensions.AI.IChatClient, System.IDisposable
+    .ctor(Kkdev92.Jev.JevClient judge, Kkdev92.Jev.Extensions.AI.JevProjection<Kkdev92.Jev.Extensions.AI.JevRouteDecision<TRoute>> projection, System.Collections.Generic.IReadOnlyDictionary<TRoute, Microsoft.Extensions.AI.IChatClient> routes, Microsoft.Extensions.AI.IChatClient? fallbackClient = null, Kkdev92.Jev.Extensions.AI.JevRoutingOptions? options = null)
+    System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default)
+    System.Object? GetService(System.Type serviceType, System.Object? serviceKey = null)
+    System.Threading.Tasks.Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default)
+    System.Void Dispose()
+sealed class Kkdev92.Jev.Extensions.AI.JevRoutingOptions
+    .ctor()
+    Kkdev92.Jev.Extensions.AI.JevChatStateOptions? StateOptions { get; set; }
+    Kkdev92.Jev.JevRequestOptions? RequestOptions { get; set; }
+    System.TimeProvider TimeProvider { get; set; }
+    System.TimeSpan? TotalTimeout { get; set; }
+enum Kkdev92.Jev.Extensions.AI.JevUnsupportedContentBehavior : System.Int32
+    Reject = 0
+    TextOnly = 1

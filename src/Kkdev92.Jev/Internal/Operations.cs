@@ -9,6 +9,7 @@ internal static class Operations
     {
         JevOperation.Evaluate => JevContract.SystemOneMethod + " " + JevContract.SystemOnePath,
         JevOperation.ListModels => JevContract.ModelsMethod + " " + JevContract.ModelsPath,
+        JevOperation.EvaluateMany => "batch evaluation",
         _ => "a TypeSafe API operation",
     };
 
@@ -17,6 +18,7 @@ internal static class Operations
     {
         JevOperation.Evaluate => "evaluate",
         JevOperation.ListModels => "models",
+        JevOperation.EvaluateMany => "evaluate_many",
         _ => "unknown",
     };
 }

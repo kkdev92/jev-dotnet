@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsTestProject>false</IsTestProject>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Kkdev92.Jev.DependencyInjection/Kkdev92.Jev.DependencyInjection.csproj" />
+    <ProjectReference Include="../../Kkdev92.Jev.Extensions.AI.Evaluation/Kkdev92.Jev.Extensions.AI.Evaluation.csproj" />
+    <ProjectReference Include="../Kkdev92.Jev.TestSupport/Kkdev92.Jev.TestSupport.csproj" />
+  </ItemGroup>
+</Project>

@@ -43,6 +43,9 @@ public enum JevOperation
 
     /// <summary><c>GET /v1/models</c>: listing the models the key can use.</summary>
     ListModels = 2,
+
+    /// <summary>A client-side batch of evaluations.</summary>
+    EvaluateMany = 3,
 }
 
 /// <summary>How far a failed request got.</summary>

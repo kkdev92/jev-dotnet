@@ -56,6 +56,7 @@ public sealed class JevDecisionPlanBuilder
     private readonly HashSet<string> _ids = new(StringComparer.Ordinal);
     private readonly List<JevImage> _images = [];
     private State _state;
+    private int _autoIndex;
 
     private enum State
     {
@@ -66,6 +67,92 @@ public sealed class JevDecisionPlanBuilder
 
     /// <summary>How many questions have been registered.</summary>
     public int Count => _questions.Count;
+
+    private string NextId(out int next)
+    {
+        next = _autoIndex;
+        string id;
+        do
+        {
+            id = "q" + next.ToString(CultureInfo.InvariantCulture);
+            next++;
+        }
+        while (_ids.Contains(id));
+
+        return id;
+    }
+
+    /// <summary>Register a choice with the next available automatic ID.</summary>
+    public JevChoiceHandle<T> AddChoice<T>(JevContent instructions, ReadOnlySpan<JevChoiceOption<T>> options) where T : notnull
+    {
+        var handle = AddChoice(NextId(out var next), instructions, options);
+        _autoIndex = next;
+        return handle;
+    }
+
+    private static void ValidateScoreCount(int length)
+    {
+        if (length is < MinScoreLevels or > MaxScoreLevels)
+        {
+            throw new ArgumentException(
+                $"A score question needs between {MinScoreLevels.ToString(CultureInfo.InvariantCulture)} and {MaxScoreLevels.ToString(CultureInfo.InvariantCulture)} levels; {length.ToString(CultureInfo.InvariantCulture)} were given.",
+                "levels");
+        }
+    }
+
+    /// <summary>Register explicitly ordered score levels using an automatic ID.</summary>
+    public JevScoreHandle<T> AddScore<T>(JevContent instructions, ReadOnlySpan<JevScoreLevel<T>> levels) where T : notnull
+    {
+        var handle = AddScore(NextId(out var next), instructions, levels);
+        _autoIndex = next;
+        return handle;
+    }
+
+    /// <summary>Register explicitly ordered score levels under a stable ID.</summary>
+    public JevScoreHandle<T> AddScore<T>(string id, JevContent instructions, ReadOnlySpan<JevScoreLevel<T>> levels) where T : notnull
+    {
+        ThrowIfNotMutable();
+        ValidateScoreCount(levels.Length);
+        var values = new T[levels.Length];
+        var descriptions = new JevContent[levels.Length];
+        for (var i = 0; i < levels.Length; i++)
+        {
+            var value = levels[i].Value;
+            ArgumentNullException.ThrowIfNull(value);
+            if (Array.IndexOf(values, value, 0, i) >= 0)
+            {
+                throw new ArgumentException("Score level values must be distinct.", nameof(levels));
+            }
+            values[i] = value;
+            descriptions[i] = levels[i].Description;
+        }
+        return new JevScoreHandle<T>(AddScore(id, instructions, descriptions), values);
+    }
+
+    /// <summary>Register a score with the next available automatic ID.</summary>
+    public JevScoreHandle AddScore(JevContent instructions, ReadOnlySpan<JevContent> levels)
+    {
+        var handle = AddScore(NextId(out var next), instructions, levels);
+        _autoIndex = next;
+        return handle;
+    }
+
+    /// <summary>Register a yes/no question with the next available automatic ID.</summary>
+    public JevNoulHandle AddNoul(JevContent instructions)
+    {
+        var handle = AddNoul(NextId(out var next), instructions);
+        _autoIndex = next;
+        return handle;
+    }
+
+    /// <summary>Register a box question with the next available automatic ID.</summary>
+    [Experimental(Experiments.Images)]
+    public JevBoxHandle AddBox(JevContent instructions)
+    {
+        var handle = AddBox(NextId(out var next), instructions);
+        _autoIndex = next;
+        return handle;
+    }
 
     /// <summary>Adds a question that selects one option from a set.</summary>
     /// <typeparam name="T">The value each option maps to. Any type; not only an enum.</typeparam>
@@ -143,8 +230,8 @@ public sealed class JevDecisionPlanBuilder
     }
 
     /// <summary>Adds a question that rates the state against ordered levels.</summary>
-    /// <param name="id">The name the answer comes back under. See <see cref="AddChoice{T}"/>.</param>
-    /// <param name="instructions">What the model should rate. See <see cref="AddChoice{T}"/>.</param>
+    /// <param name="id">The name the answer comes back under. See <see cref="AddChoice{T}(string, JevContent, ReadOnlySpan{JevChoiceOption{T}})"/>.</param>
+    /// <param name="instructions">What the model should rate. See <see cref="AddChoice{T}(string, JevContent, ReadOnlySpan{JevChoiceOption{T}})"/>.</param>
     /// <param name="levels">
     /// Between <see cref="MinScoreLevels"/> and <see cref="MaxScoreLevels"/> level descriptions, from
     /// the low end to the high end: text, objects or arrays. A level's score is its position,
@@ -161,12 +248,7 @@ public sealed class JevDecisionPlanBuilder
         ValidateId(id);
         ValidateInstructions(instructions);
 
-        if (levels.Length is < MinScoreLevels or > MaxScoreLevels)
-        {
-            throw new ArgumentException(
-                $"A score question needs between {MinScoreLevels.ToString(CultureInfo.InvariantCulture)} and {MaxScoreLevels.ToString(CultureInfo.InvariantCulture)} levels; {levels.Length.ToString(CultureInfo.InvariantCulture)} were given.",
-                nameof(levels));
-        }
+        ValidateScoreCount(levels.Length);
 
         for (var i = 0; i < levels.Length; i++)
         {
@@ -179,8 +261,8 @@ public sealed class JevDecisionPlanBuilder
     }
 
     /// <summary>Adds a yes/no question, answered with the probability of yes.</summary>
-    /// <param name="id">The name the answer comes back under. See <see cref="AddChoice{T}"/>.</param>
-    /// <param name="instructions">The question or statement to judge. See <see cref="AddChoice{T}"/>.</param>
+    /// <param name="id">The name the answer comes back under. See <see cref="AddChoice{T}(string, JevContent, ReadOnlySpan{JevChoiceOption{T}})"/>.</param>
+    /// <param name="instructions">The question or statement to judge. See <see cref="AddChoice{T}(string, JevContent, ReadOnlySpan{JevChoiceOption{T}})"/>.</param>
     /// <param name="criteria">What counts as yes and as no. <c>default</c> sends none.</param>
     /// <returns>A handle for reading the answer from a <see cref="JevResult"/> of this plan.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="id"/> is <see langword="null"/>.</exception>
@@ -208,10 +290,10 @@ public sealed class JevDecisionPlanBuilder
     }
 
     /// <summary>Adds a question that finds where something is in an image, answered with the four edges of a box around it.</summary>
-    /// <param name="id">The name the answer comes back under. See <see cref="AddChoice{T}"/>.</param>
+    /// <param name="id">The name the answer comes back under. See <see cref="AddChoice{T}(string, JevContent, ReadOnlySpan{JevChoiceOption{T}})"/>.</param>
     /// <param name="instructions">
     /// What to find, and in which image: "the coffee mug in `photo`" is enough. See
-    /// <see cref="AddChoice{T}"/>. A picture of the target can be part of it, through its
+    /// <see cref="AddChoice{T}(string, JevContent, ReadOnlySpan{JevChoiceOption{T}})"/>. A picture of the target can be part of it, through its
     /// <see cref="JevImage.Reference"/>.
     /// </param>
     /// <returns>A handle for reading the answer from a <see cref="JevResult"/> of this plan.</returns>

@@ -18,13 +18,18 @@ the contract.
 
 - `net10.0` and C# 14, targeted directly
 - **Zero non-framework runtime dependencies** in the core package
-- Questions encoded once per plan, not once per call; a choice maps back to your own value type
+- Questions encoded once per plan, not once per call; a choice or a score level maps back to your
+  own value type
 - A response that does not answer the plan — a missing or extra answer, an unknown label, a
   probability of 1.5 — fails loudly instead of being defaulted or clamped
 - One deadline per call, no retries unless you ask, and a wait the server asks for never cut
   short
-- Native AOT and trimming treated as a requirement: a consumer application is published with
-  `PublishAot=true` in CI
+- Many states against one plan, through a bounded number of workers, every outcome back in input
+  order
+- A server of your own that serves the same API: plain HTTP and requests without a key are each an
+  explicit opt-in
+- Native AOT and trimming treated as a requirement: consumer applications, with the AI packages and
+  without, are published with `PublishAot=true` in CI and run
 
 ## Install
 
@@ -32,15 +37,20 @@ the contract.
 # --prerelease, because every version so far is one and the CLI does not consider pre-release
 # versions unless asked.
 dotnet add package Kkdev92.Jev --prerelease
-dotnet add package Kkdev92.Jev.DependencyInjection --prerelease   # optional
+dotnet add package Kkdev92.Jev.DependencyInjection --prerelease          # optional
+dotnet add package Kkdev92.Jev.Extensions.AI --prerelease                # optional
+dotnet add package Kkdev92.Jev.Extensions.AI.Evaluation --prerelease     # optional
 ```
 
-This readme ships in both packages.
+This readme ships in `Kkdev92.Jev` and `Kkdev92.Jev.DependencyInjection`; the AI packages have
+their own.
 
 | Package | Purpose |
 |---|---|
 | `Kkdev92.Jev` | The client, decision plans, answers, errors, diagnostics |
-| `Kkdev92.Jev.DependencyInjection` | `AddJev()`: a typed client over `IHttpClientFactory` |
+| `Kkdev92.Jev.DependencyInjection` | `AddJev()`: a typed client over `IHttpClientFactory`, optionally configured from a configuration section |
+| [`Kkdev92.Jev.Extensions.AI`](https://www.nuget.org/packages/Kkdev92.Jev.Extensions.AI) | A guard and a router for any Microsoft.Extensions.AI `IChatClient`, and a decision as an `AIFunction` |
+| [`Kkdev92.Jev.Extensions.AI.Evaluation`](https://www.nuget.org/packages/Kkdev92.Jev.Extensions.AI.Evaluation) | Microsoft.Extensions.AI.Evaluation metrics from a decision |
 
 ## Getting started
 
@@ -62,7 +72,7 @@ var urgent = builder.AddNoul("urgent", "Does the customer need an answer today?"
 
 var plan = builder.Build(); // once; reuse it for every call
 
-using var httpClient = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false })
+using var httpClient = new HttpClient(new SocketsHttpHandler { UseCookies = false, AllowAutoRedirect = false })
 {
     Timeout = Timeout.InfiniteTimeSpan, // the client's own deadline applies instead
 };
@@ -89,6 +99,13 @@ using Kkdev92.Jev.DependencyInjection;
 services.AddJev(options => options.Credential = myCredential);
 ```
 
+The [readme](https://github.com/kkdev92/jev-dotnet/blob/main/README.md#usage) shows the rest:
+[many states against one plan](https://github.com/kkdev92/jev-dotnet/blob/main/README.md#many-states-one-plan),
+[scores in your own values](https://github.com/kkdev92/jev-dotnet/blob/main/README.md#scores-in-your-own-values),
+[a server of your own](https://github.com/kkdev92/jev-dotnet/blob/main/README.md#your-own-server),
+[settings from configuration](https://github.com/kkdev92/jev-dotnet/blob/main/README.md#settings-from-configuration)
+and [Microsoft.Extensions.AI](https://github.com/kkdev92/jev-dotnet/blob/main/README.md#with-microsoftextensionsai).
+
 Images and box questions — finding where something is in an image — are experimental, as they are
 at TypeSafe. Their types and members are marked `[Experimental("JEV001")]`; add `JEV001` to
 `<NoWarn>` to use them. The
@@ -110,9 +127,10 @@ printing a result prints its size and the model that answered, never an answer.
 One thing sits outside that boundary and is yours to handle: a logging `DelegatingHandler` added to
 the client's pipeline sees the `Authorization` header and the request body in full.
 
-`JevClient` never looks for a key on its own — `Credential` is required — and nothing here writes
-one to disk. The key goes over HTTPS only, on the one request it belongs to, never in
-`DefaultRequestHeaders`, and every body is read under a byte limit.
+`JevClient` never looks for a key on its own — `Credential` is required unless you choose to send
+none — and nothing here writes one to disk. The key goes over HTTPS unless you allow plain HTTP for
+an address, on the one request it belongs to, never in `DefaultRequestHeaders`, and every body is
+read under a byte limit.
 
 Using this SDK does not by itself make an application compliant with TypeSafe's
 [terms of use](https://typesafe.ai/legal/terms) or with any data protection regime. What is sent as

@@ -159,8 +159,8 @@ jobs:
       - name: Pack
         run: dotnet pack src/Jev.slnx -c Release --no-build -o artifacts
 
-      # Exactly two packages and two symbol packages, named for the version. A missing or extra one
-      # means something changed about what ships, which is not a thing to notice afterwards.
+      # Exactly four packages and four symbol packages, named for the version. A missing or extra
+      # one means something changed about what ships, which is not a thing to notice afterwards.
       - name: Check the artefact set
         run: |
           if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
@@ -172,8 +172,8 @@ jobs:
           nupkgs=$(ls artifacts/*.nupkg 2>/dev/null | wc -l)
           snupkgs=$(ls artifacts/*.snupkg 2>/dev/null | wc -l)
 
-          if [ "$nupkgs" -ne 2 ] || [ "$snupkgs" -ne 2 ]; then
-            echo "::error::Expected 2 nupkg and 2 snupkg, found ${nupkgs} and ${snupkgs}." >&2
+          if [ "$nupkgs" -ne 4 ] || [ "$snupkgs" -ne 4 ]; then
+            echo "::error::Expected 4 nupkg and 4 snupkg, found ${nupkgs} and ${snupkgs}." >&2
             ls -l artifacts/ >&2
             exit 1
           fi
@@ -192,69 +192,8 @@ jobs:
 
       # A regression that exists only in what gets packed — missing trimming metadata, a nuspec that
       # resolves differently — is invisible to the ProjectReference smoke above.
-      - name: Native AOT from the packages alone
-        run: |
-          version=$(ls artifacts/Kkdev92.Jev.[0-9]*.nupkg | head -1 \
-            | sed 's|.*/Kkdev92[.]Jev[.]||; s|[.]nupkg$||')
-
-          mkdir -p "${RUNNER_TEMP}/aot-consumer"
-          cd "${RUNNER_TEMP}/aot-consumer"
-
-          cat > nuget.config <<EOF
-          <?xml version="1.0" encoding="utf-8"?>
-          <configuration>
-            <packageSources>
-              <clear />
-              <add key="artifacts" value="${GITHUB_WORKSPACE}/artifacts" />
-              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-            </packageSources>
-            <packageSourceMapping>
-              <packageSource key="artifacts"><package pattern="Kkdev92.Jev*" /></packageSource>
-              <packageSource key="nuget.org"><package pattern="*" /></packageSource>
-            </packageSourceMapping>
-          </configuration>
-          EOF
-
-          cat > Consumer.csproj <<EOF
-          <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <OutputType>Exe</OutputType>
-              <TargetFramework>net10.0</TargetFramework>
-              <Nullable>enable</Nullable>
-              <ImplicitUsings>enable</ImplicitUsings>
-              <PublishAot>true</PublishAot>
-              <TrimmerSingleWarn>false</TrimmerSingleWarn>
-              <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
-              <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-            </PropertyGroup>
-            <ItemGroup>
-              <PackageReference Include="Kkdev92.Jev" Version="${version}" />
-              <PackageReference Include="Kkdev92.Jev.DependencyInjection" Version="${version}" />
-            </ItemGroup>
-          </Project>
-          EOF
-
-          cat > Program.cs <<'EOF'
-          using Kkdev92.Jev;
-          using Kkdev92.Jev.DependencyInjection;
-          using Microsoft.Extensions.DependencyInjection;
-
-          var services = new ServiceCollection();
-          services.AddJev(o => o.Credential = new StaticJevCredential("sk-package-consumer-not-a-key"));
-
-          using var provider = services.BuildServiceProvider();
-
-          var builder = new JevDecisionPlanBuilder();
-          builder.AddNoul("urgent", "Does this need an answer today?");
-
-          Console.WriteLine(provider.GetRequiredService<JevClient>() is not null);
-          Console.WriteLine(builder.Build().QuestionCount);
-          Console.WriteLine("package-only AOT ok");
-          EOF
-
-          NUGET_PACKAGES="${RUNNER_TEMP}/aot-cache" dotnet publish -c Release -o out
-          ./out/Consumer | tee result.txt
-          grep -q "package-only AOT ok" result.txt
+      - name: Verify isolated package consumers and execute Native AOT
+        run: python eng/verify-consumers.py artifacts
 
       # A signed statement that these exact bytes came out of this workflow, at this commit, in this
       # repository — verifiable by anyone with `gh attestation verify`. Only on a tag: an
@@ -297,8 +236,8 @@ jobs:
           nupkgs=$(ls artifacts/*.nupkg 2>/dev/null | wc -l)
           snupkgs=$(ls artifacts/*.snupkg 2>/dev/null | wc -l)
 
-          if [ "$nupkgs" -ne 2 ] || [ "$snupkgs" -ne 2 ]; then
-            echo "::error::Downloaded ${nupkgs} nupkg and ${snupkgs} snupkg, expected 2 and 2." >&2
+          if [ "$nupkgs" -ne 4 ] || [ "$snupkgs" -ne 4 ]; then
+            echo "::error::Downloaded ${nupkgs} nupkg and ${snupkgs} snupkg, expected 4 and 4." >&2
             ls -l artifacts/ >&2
             exit 1
           fi

@@ -16,6 +16,63 @@ Dates are UTC, taken from when the packages went to nuget.org.
 
 ## [Unreleased]
 
+### Added
+
+- `JevClient.EvaluateManyAsync` and `EvaluateManyContentAsync` evaluate a list of states against one
+  plan through a bounded number of workers, four by default, within the client's own admission
+  limit. `JevBatchResult` holds one `JevBatchItemResult` per input, in input order — succeeded,
+  failed, canceled or never started — with the transmission of all of its attempts.
+  `JevBatchOptions` sets the workers, the most inputs accepted (1,024 by default), one deadline for
+  the whole batch, and whether a failure stops it (`FailFast`, the default) or is recorded
+  (`Collect`). A batch that stops throws `JevBatchException`, `JevBatchTimeoutException` or
+  `JevBatchCanceledException`, each carrying that snapshot; `JevBatchException.Operation` is the new
+  `JevOperation.EvaluateMany`.
+- Questions without an id. `AddChoice`, `AddScore`, `AddNoul` and `AddBox` each gain an overload
+  that takes none and names the question `q0`, `q1` and so on, skipping ids already taken.
+- Scores in your own values. `JevDecisionPlanBuilder.AddScore<T>` takes `JevScoreLevel<T>` levels
+  in the order they are sent, and `JevResult.GetScore` reads a `ScoreAnswer<T>`: the expectation
+  over the levels' positions, the most probable level as your value (the first listed on a tie),
+  and the probability of each.
+- Servers other than TypeSafe's. `BaseAddress` can carry a path prefix, which the API's own paths
+  are appended to. Plain HTTP is allowed to this machine with `JevClientOptions.AllowLoopbackHttp`,
+  and to exact origins, port included, with `AllowedInsecureHttpOrigins`.
+  `JevAuthenticationMode.None`, as the client's `AuthenticationMode` or a call's, sends no key and
+  no `Authorization` header, and refuses a credential.
+- `AddJev(IConfiguration, ...)` in `Kkdev92.Jev.DependencyInjection` reads the client's options from
+  a configuration section, then runs the delegate, which supplies the credential and wins over the
+  section. An unknown key or an unreadable value fails options validation, without echoing it.
+- `Kkdev92.Jev.Extensions.AI`, a new package. `JevGuardChatClient` and `UseJevGuard` decide on a
+  request before it reaches an `IChatClient`, and on the reply before it is returned, holding a
+  streamed reply until it has been judged. `JevRoutingChatClient<TRoute>` sends a request to the
+  client a decision picks, and `JevAIFunction.Create` exposes a decision as an `AIFunction`.
+- `Kkdev92.Jev.Extensions.AI.Evaluation`, a new package. `JevEvaluator<T>` is an `IEvaluator` that
+  turns one decision into numeric, boolean and string metrics.
+
+### Changed
+
+- **Breaking:** the handler `AddJev` gives the client keeps no cookies, and, when `BaseAddress` is
+  plain HTTP, does not go through the system proxy. An application that relied on cookies through
+  that handler configures a handler of its own.
+- **Breaking:** a `JevTransportException`, and the `OperationCanceledException` of a call its caller
+  canceled, no longer carry the exception they were translated from as `InnerException`: its
+  message can name the host or quote a handler's text. `Failure`, `Transmission`, `Operation` and
+  the caller's token say what happened.
+- **Breaking:** `BaseAddress` is checked as written, before `Uri` normalizes it. A spelling with
+  whitespace, a backslash, an empty port, a `.` or `..` segment or an encoded slash is refused,
+  where one that normalized to a plain origin used to be accepted.
+- `Kkdev92.Jev.DependencyInjection` also depends on `Microsoft.Extensions.Configuration.Abstractions`
+  10.0.15 or later.
+
+### Notes
+
+- `Kkdev92.Jev.Extensions.AI` depends on `Microsoft.Extensions.AI` 11.0.1, and
+  `Kkdev92.Jev.Extensions.AI.Evaluation` also on `Microsoft.Extensions.AI.Evaluation` 11.0.1. Those
+  depend on the 11.x `Microsoft.Extensions` abstractions, which an application that references the
+  AI packages resolves, on .NET 10 too. The core and the dependency-injection package stay on 10.x.
+- Servers other than TypeSafe's are checked offline only: the tests decode response examples
+  published for two of them. The AI packages are exercised offline, against a fake judge and a fake
+  provider.
+
 ## [0.2.1-alpha] - 2026-11-19
 
 Generated from the same snapshot of TypeSafe's contract as 0.2.0-alpha: OpenAPI document `3.1.0`,
