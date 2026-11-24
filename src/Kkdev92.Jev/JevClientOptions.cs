@@ -164,8 +164,9 @@ public sealed class JevClientOptions
     /// The absolute tolerance of the consistency checks and of the documented ranges, 1e-6 by default.
     /// </summary>
     /// <remarks>
-    /// A provisional value of this SDK's, not a precision TypeSafe states. Its OpenAPI document says
-    /// the probabilities sum to "approximately 1", and its HTTP reference that they sum to 1.
+    /// A provisional value of this SDK's, not a precision TypeSafe states. Its OpenAPI document and
+    /// HTTP reference say the probabilities sum to "approximately 1", and its page on scores that
+    /// they sum to 1.
     /// </remarks>
     public double NumericalAbsoluteTolerance { get; set; } = 1e-6;
 
