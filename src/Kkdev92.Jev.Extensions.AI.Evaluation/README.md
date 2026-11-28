@@ -61,7 +61,7 @@ it includes `RequestIdentifiers`, the model names and the request id.
 |---|---|
 | [Readme](https://github.com/kkdev92/jev-dotnet/blob/main/README.md) | Usage, what is guaranteed, known limitations, how it works |
 | [Changelog](https://github.com/kkdev92/jev-dotnet/blob/main/CHANGELOG.md) | What changed, and against which contract |
-| [Security](https://github.com/kkdev92/jev-dotnet/blob/main/SECURITY.md) | What is and is not recorded, and how to report a vulnerability |
+| [Security](https://github.com/kkdev92/jev-dotnet/blob/main/PROJECT_GUIDE.md#security-and-private-reports) | What is and is not recorded, and how to report a vulnerability |
 
 Source, issues and discussion: <https://github.com/kkdev92/jev-dotnet>
 
