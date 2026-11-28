@@ -30,6 +30,8 @@ failed loudly than turned into a default._
 
 ## Table of Contents
 
+Before reporting a problem or working on this project, read the [project guide](https://github.com/kkdev92/jev-dotnet/blob/HEAD/PROJECT_GUIDE.md).
+
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
@@ -716,8 +718,8 @@ For vulnerability reporting, see [SECURITY.md](SECURITY.md).
 | --- | --- |
 | XML documentation | Every public type and member, in the package: what each call does, what it throws and when |
 | [Changelog](CHANGELOG.md) | What changed in each release, and the TypeSafe contract it was generated from |
-| [Contributing](CONTRIBUTING.md) | Building, testing, and the rules a change has to follow |
-| [Security](SECURITY.md) | What is and is not recorded, and how to report a vulnerability |
+| [Project guide](https://github.com/kkdev92/jev-dotnet/blob/HEAD/PROJECT_GUIDE.md#development-instructions) | Building, testing, and the rules a change has to follow |
+| [Security](https://github.com/kkdev92/jev-dotnet/blob/HEAD/PROJECT_GUIDE.md#security-and-private-reports) | What is and is not recorded, and how to report a vulnerability |
 | [Benchmarks](src/benchmarks/BASELINE.md) | What is measured, on what, and the numbers |
 | [Where TypeSafe's descriptions differ](spec/typesafe-v1/semantics.json) | Each difference, its sources, and what this SDK does about it |
 
@@ -725,29 +727,13 @@ For vulnerability reporting, see [SECURITY.md](SECURITY.md).
 
 ## Contributing
 
-```bash
-dotnet restore src/Jev.slnx
-dotnet build   src/Jev.slnx -c Release
-dotnet test --solution src/Jev.slnx -c Release -- --filter-not-trait Category=Package
-```
-
-Read [CONTRIBUTING.md](CONTRIBUTING.md) first — particularly the rules that are not negotiable,
-and the note on never hand-editing anything under `Generated/` or the extracted contract.
-
-Helpful things when reporting bugs:
-
-- The package version, `dotnet --version`, and whether you publish with Native AOT
-- The exception type, `ex.Message`, and `StatusCode`, `Error` or `Failure` as it applies — the
-  message is built to be pasted
-- `RequestId`, if the service sent one. It identifies the call to TypeSafe and nothing else
-- Whether it fails while building the plan, while sending, or on the response
-
-**Never paste an API key, a real state, or real instructions or labels into an issue.** A
-reproduction with made-up text is always enough, and an issue is public and stays that way.
+Start with the [project guide](https://github.com/kkdev92/jev-dotnet/blob/HEAD/PROJECT_GUIDE.md) for development and verification. To submit an issue or pull request, see the [shared contribution guidelines](https://github.com/kkdev92/.github/blob/main/CONTRIBUTING.md).
 
 ---
 
 ## Support & Maintenance Policy
+
+For a bug report, follow the [reporting instructions](https://github.com/kkdev92/jev-dotnet/blob/HEAD/PROJECT_GUIDE.md#reporting-a-problem).
 
 This is a personal project maintained in spare time. It is active, but support is best-effort:
 I'll do my best to review issues and PRs, and releases may be a bit slow sometimes — thank you for
